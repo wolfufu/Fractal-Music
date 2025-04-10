@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fractal Music Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Fractal Music Generator</h1>
+        <div class="controls">
+            <select id="fractalType">
+                <option value="lsystem">L-System</option>
+                <option value="mandelbrot">Mandelbrot</option>
+            </select>
+            <input type="number" id="iterations" value="3" min="1" max="10">
+            <button id="generateBtn">Generate</button>
+            <button id="playBtn">Play</button>
+            <button id="downloadBtn">Download MIDI</button>
+        </div>
+        <div id="canvasContainer"></div>
+        <div id="visualizer"></div>
+    </div>
+    <script src="sketch.js"></script>
+</body>
+</html>
