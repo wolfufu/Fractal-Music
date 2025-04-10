@@ -1,0 +1,4 @@
+flask==2.0.1
+numpy==1.21.2
+MIDIUtil==1.2.1
+waitress==2.1.2
