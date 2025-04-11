@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function setDefaultValues() {
         // Основные настройки
         safeSetControlValue(elements.tempo, elements.tempoValue, state.settings.tempo, 120);
-        safeSetControlValue(elements.rootNote, null, state.settings.root_note, 60);
+        safeSetControlValue(elements.rootNote, elements.rootNoteValue, state.settings.root_note, 60);
         safeSetControlValue(elements.scale, null, state.settings.scale, 'major');
         
         // Инструменты
@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Подготовка настроек
             const settings = {
                 tempo: getValidNumber(elements.tempo?.value, 120, 40, 200),
-                root_note: getValidNumber(elements.rootNote?.value, 60, 0, 127),
+                root_note: getValidNumber(elements.rootNote?.value, 60, 48, 72),
                 scale: elements.scale?.value || 'major',
                 instruments: {
                     melody: getValidNumber(elements.melodyInstr?.value, 5, 0, 127),
@@ -245,6 +245,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             };
             
+            // Логируем настройки для отладки
+            console.log("Sending settings:", settings);
+            
             // Отправка запроса
             const response = await fetchWithTimeout('/api/generate', {
                 method: 'POST',
@@ -257,8 +260,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Обработка ответа
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || "Ошибка сервера");
+                let errorMsg = "Ошибка сервера";
+                try {
+                    const errorData = await response.json();
+                    errorMsg = errorData.error || errorMsg;
+                } catch (e) {
+                    console.error("Failed to parse error response:", e);
+                }
+                throw new Error(errorMsg);
             }
             
             // Скачивание файла

@@ -72,8 +72,8 @@ def validate_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
 
         # Основная нота
         validated['root_note'] = int(settings.get('root_note', DEFAULT_SETTINGS['root_note']))
-        if not 0 <= validated['root_note'] <= 127:
-            raise ValueError("Root note must be between 0 and 127")
+        if not 21 <= validated['root_note'] <= 108:  # Диапазон стандартного MIDI-клавиатуры
+            raise ValueError("Root note must be between 21 and 108")
 
         # Инструменты
         validated['instruments'] = {}
@@ -129,21 +129,15 @@ def validate_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("Humanize must be between 0 and 1")
             
         # Громкость
-        validated['effects']['melody_volume'] = int(
-            effects_settings.get('melody_volume', DEFAULT_SETTINGS['effects']['melody_volume'])
-        )
+        validated['effects']['melody_volume'] = int(settings.get('effects', {}).get('melody_volume', 110))
         if not 0 <= validated['effects']['melody_volume'] <= 127:
             raise ValueError("Melody volume must be between 0 and 127")
             
-        validated['effects']['bass_volume'] = int(
-            effects_settings.get('bass_volume', DEFAULT_SETTINGS['effects']['bass_volume'])
-        )
+        validated['effects']['bass_volume'] = int(settings.get('effects', {}).get('bass_volume', 115))
         if not 0 <= validated['effects']['bass_volume'] <= 127:
             raise ValueError("Bass volume must be between 0 and 127")
             
-        validated['effects']['drums_volume'] = int(
-            effects_settings.get('drums_volume', DEFAULT_SETTINGS['effects']['drums_volume'])
-        )
+        validated['effects']['drums_volume'] = int(settings.get('effects', {}).get('drums_volume', 127))
         if not 0 <= validated['effects']['drums_volume'] <= 127:
             raise ValueError("Drums volume must be between 0 and 127")
 
@@ -184,19 +178,20 @@ def generate_music(settings: Dict[str, Any]) -> io.BytesIO:
     try:
         midi = MIDIFile(3)
         midi.addTempo(0, 0, settings['tempo'])
-        
+
         # Установка инструментов
         midi.addProgramChange(0, 0, 0, settings['instruments']['melody'])
         midi.addProgramChange(1, 0, 0, settings['instruments']['bass'])
         
         # Громкость треков
-        melody_vol = settings['effects']['melody_volume']
-        bass_vol = settings['effects']['bass_volume']
-        drums_vol = settings['effects']['drums_volume']
+        melody_vol = int(settings['effects']['melody_volume'])
+        bass_vol = int(settings['effects']['bass_volume'])
+        drums_vol = int(settings['effects']['drums_volume'])
         
         # Генерация мелодии
+        root_note = max(48, settings['root_note'])  # Не ниже C3 (48)
         scale = SCALES[settings['scale']]
-        melody_notes = [settings['root_note'] + note for note in scale * 2]
+        melody_notes = [root_note + note for note in scale * 2]
         
         l_system_seq = generate_rich_l_system(
             settings['fractal_params']['l_system_iter'],
@@ -209,12 +204,12 @@ def generate_music(settings: Dict[str, Any]) -> io.BytesIO:
             
             # Динамическая громкость с акцентами
             velocity = melody_vol - 20 + (i % 4) * 15
-            velocity = min(127, max(80, velocity))
+            velocity = int(min(127, max(80, velocity)))
             
             # Добавление человеческого фактора
             if settings['effects']['humanize'] > 0:
-                velocity += random.randint(-10, 10) * settings['effects']['humanize']
-                velocity = min(127, max(60, velocity))
+                velocity += int(random.randint(-10, 10) * settings['effects']['humanize'])
+                velocity = int(min(127, max(60, velocity)))
             
             duration = 0.25 + (i % 3) * 0.1
             time = i * 0.25
@@ -246,20 +241,20 @@ def generate_music(settings: Dict[str, Any]) -> io.BytesIO:
             velocity = bass_vol - 20 + (step % 4) * 10
             midi.addNote(1, 0, note, step * 0.25, 0.5, velocity)
         
-        # Энергичные ударные
+        # Ударные
         drum_pattern = generate_drum_pattern(settings['fractal_params']['drum_levels'])
         for step in range(32):
             if drum_pattern[step % len(drum_pattern)]:
-                # Kick (громкий)
-                midi.addNote(2, 9, 35, step * 0.125, 0.1, drums_vol)
+                # Kick
+                midi.addNote(2, 9, 35, step * 0.125, 0.1, int(drums_vol))
                 
-                # Snare на четных долях
+                # Snare
                 if step % 4 == 2:
-                    midi.addNote(2, 9, 38, step * 0.125 + 0.05, 0.1, drums_vol - 10)
+                    midi.addNote(2, 9, 38, step * 0.125 + 0.05, 0.1, int(drums_vol - 10))
                 
-                # Hi-hat на восьмых
+                # Hi-hat
                 if step % 2 == 1:
-                    midi.addNote(2, 9, 42, step * 0.125, 0.05, drums_vol - 20)
+                    midi.addNote(2, 9, 42, step * 0.125, 0.05, int(drums_vol - 20))
         
         midi_data = io.BytesIO()
         midi.writeFile(midi_data)
@@ -293,7 +288,9 @@ def get_settings():
 @app.route('/api/generate', methods=['POST'])
 def generate():
     try:
+        app.logger.debug(f"Received request: {request.data}")
         if not request.is_json:
+            app.logger.error("Request is not JSON")
             return jsonify({
                 "success": False,
                 "error": "Request must be JSON"
@@ -301,13 +298,32 @@ def generate():
             
         request_data = request.get_json()
         if not request_data:
+            app.logger.error("No data provided")
             return jsonify({
                 "success": False,
                 "error": "No data provided"
             }), 400
         
-        settings = validate_settings(request_data.get('settings', {}))
-        midi_data = generate_music(settings)
+        # Логируем полученные данные для отладки
+        app.logger.debug(f"Received data: {request_data}")
+        
+        try:
+            settings = validate_settings(request_data.get('settings', {}))
+        except ValueError as e:
+            app.logger.error(f"Settings validation failed: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 400
+            
+        try:
+            midi_data = generate_music(settings)
+        except Exception as e:
+            app.logger.error(f"Music generation failed: {str(e)}", exc_info=True)
+            return jsonify({
+                "success": False,
+                "error": "Failed to generate music"
+            }), 500
         
         return send_file(
             midi_data,
@@ -316,13 +332,8 @@ def generate():
             download_name='fractal_music.mid'
         )
         
-    except ValueError as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 400
     except Exception as e:
-        app.logger.error(f"API error: {str(e)}", exc_info=True)
+        app.logger.error(f"Unexpected error in generate endpoint: {str(e)}", exc_info=True)
         return jsonify({
             "success": False,
             "error": "Internal server error"
