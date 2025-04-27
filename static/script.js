@@ -94,6 +94,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             setDefaultValues();
             setupEventListeners();
             
+            // Отрисовка начального фрактала
+            drawFractal(state.settings);
+            
             state.isInitialized = true;
             showStatus("Готово к генерации музыки!", "success");
         } catch (error) {
@@ -244,6 +247,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     drums_volume: getValidNumber(elements.drumsVol?.value, 127, 0, 127)
                 }
             };
+
+            drawFractal(settings);
             
             // Логируем настройки для отладки
             console.log("Sending settings:", settings);
@@ -328,6 +333,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         };
 
+        const fractalParams = [
+            elements.lSystemIter,
+            elements.chaosLevel,
+            elements.scale
+        ];
+        
+        fractalParams.forEach(element => {
+            if (element) {
+                element.addEventListener('input', () => {
+                    const settings = getCurrentSettings();
+                    drawFractal(settings);
+                });
+            }
+        });
+
         connectSliderToDisplay(elements.tempo, elements.tempoValue);
         connectSliderToDisplay(elements.lSystemIter, elements.lSystemIterValue);
         connectSliderToDisplay(elements.chaosLevel, elements.chaosLevelValue);
@@ -342,6 +362,121 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (elements.generateBtn) {
             elements.generateBtn.addEventListener('click', generateMusic);
         }
+    }
+
+    function getCurrentSettings() {
+        return {
+            tempo: getValidNumber(elements.tempo?.value, 120, 40, 200),
+            root_note: getValidNumber(elements.rootNote?.value, 60, 48, 72),
+            scale: elements.scale?.value || 'major',
+            instruments: {
+                melody: getValidNumber(elements.melodyInstr?.value, 5, 0, 127),
+                bass: getValidNumber(elements.bassInstr?.value, 38, 0, 127),
+                drums: getValidNumber(elements.drumInstr?.value, 118, 0, 127)
+            },
+            fractal_params: {
+                l_system_iter: getValidNumber(elements.lSystemIter?.value, 6, 3, 10),
+                chaos_level: getValidNumber(elements.chaosLevel?.value, 20, 0, 100) / 100,
+                drum_levels: getValidNumber(elements.drumLevels?.value, 5, 2, 7)
+            },
+            effects: {
+                arpeggio: elements.arpeggio?.checked || true,
+                reverb: elements.reverb?.checked || false,
+                swing: getValidNumber(elements.swing?.value, 30, 0, 100) / 100,
+                humanize: getValidNumber(elements.humanize?.value, 20, 0, 100) / 100,
+                melody_volume: getValidNumber(elements.melodyVol?.value, 110, 0, 127),
+                bass_volume: getValidNumber(elements.bassVol?.value, 115, 0, 127),
+                drums_volume: getValidNumber(elements.drumsVol?.value, 127, 0, 127)
+            }
+        };
+    }
+
+    function drawFractal(settings) {
+        const canvas = document.getElementById('fractal-canvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        
+        // Очищаем canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Параметры для отрисовки
+        const iterations = settings.fractal_params.l_system_iter;
+        const chaos = settings.fractal_params.chaos_level;
+        const scale = settings.scale;
+        
+        // Генерируем L-систему
+        const lSystemSeq = generateLSystemForVisualization(iterations, chaos);
+        
+        // Отрисовываем фрактал
+        drawLSystem(ctx, lSystemSeq, canvas.width, canvas.height);
+    }
+
+    function generateLSystemForVisualization(iterations, chaos) {
+        // Упрощенная версия для визуализации
+        const rules = {
+            'F': ['F[+F]F[-F]F', 'F[+F]F', 'F[-F]F', 'FF+[+F-F-F]-[-F+F+F]']
+        };
+        let seq = 'F';
+        
+        for (let i = 0; i < iterations; i++) {
+            let newSeq = '';
+            for (const c of seq) {
+                if (c in rules && Math.random() > chaos) {
+                    newSeq += rules[c][Math.floor(Math.random() * rules[c].length)];
+                } else {
+                    newSeq += c;
+                }
+            }
+            seq = newSeq;
+        }
+        return seq;
+    }
+
+    function drawLSystem(ctx, sequence, width, height) {
+        const len = 5;
+        let angle = Math.PI / 4;
+        let x = width / 2;
+        let y = height;
+        let a = -Math.PI / 2; // Начинаем рисовать вверх
+        let stack = [];
+        
+        ctx.strokeStyle = '#4a6fa5';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        for (const c of sequence) {
+            switch (c) {
+                case 'F':
+                    x += len * Math.cos(a);
+                    y += len * Math.sin(a);
+                    ctx.lineTo(x, y);
+                    break;
+                case '+':
+                    a += angle;
+                    break;
+                case '-':
+                    a -= angle;
+                    break;
+                case '[':
+                    stack.push({x, y, a});
+                    break;
+                case ']':
+                    const state = stack.pop();
+                    if (state) {
+                        x = state.x;
+                        y = state.y;
+                        a = state.a;
+                        ctx.moveTo(x, y);
+                    }
+                    break;
+            }
+        }
+        
+        ctx.stroke();
     }
 
     // Запуск приложения
