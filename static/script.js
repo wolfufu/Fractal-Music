@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tempo: document.getElementById('tempo'),
         tempoValue: document.getElementById('tempo-value'),
         rootNote: document.getElementById('root-note'),
+        rootNoteValue: document.getElementById('root-note-value'),
         scale: document.getElementById('scale'),
         
         // Инструменты
@@ -327,9 +328,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Обновление значений ползунков
         const connectSliderToDisplay = (slider, display) => {
             if (slider && display) {
+                console.log(`Connecting slider: ${slider.id} to display: ${display.id}`);
                 slider.addEventListener('input', () => {
+                    console.log(`Slider ${slider.id} changed to: ${slider.value}`);
                     display.textContent = slider.value;
                 });
+            } else {
+                console.error('Slider or display element not found', {slider, display});
             }
         };
 
@@ -339,7 +344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.scale
         ];
         
-        fractalParams.forEach(element => {
+        fractalParams.forEach(element => {setDefaultValues()
             if (element) {
                 element.addEventListener('input', () => {
                     const settings = getCurrentSettings();
@@ -357,6 +362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         connectSliderToDisplay(elements.melodyVol, elements.melodyVolValue);
         connectSliderToDisplay(elements.bassVol, elements.bassVolValue);
         connectSliderToDisplay(elements.drumsVol, elements.drumsVolValue);
+        connectSliderToDisplay(elements.rootNote, elements.rootNoteValue);
         
         // Кнопка генерации
         if (elements.generateBtn) {
