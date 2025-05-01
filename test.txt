@@ -1,0 +1,1225 @@
+appp.py
+from flask import Flask, render_template, request, send_file, jsonify
+from midiutil import MIDIFile
+import io
+import random
+import logging
+from typing import Dict, Any
+
+app = Flask(__name__)
+app.logger.setLevel(logging.DEBUG)
+
+# Конфигурация
+SCALES = {
+    "major": [0, 2, 4, 5, 7, 9, 11],
+    "minor": [0, 2, 3, 5, 7, 8, 10],
+    "pentatonic": [0, 2, 4, 7, 9],
+    "dorian": [0, 2, 3, 5, 7, 9, 10],
+    "phrygian": [0, 1, 3, 5, 7, 8, 10]
+}
+
+INSTRUMENTS = {
+    "Electric Piano": 5,
+    "Bright Piano": 1,
+    "Synth Lead": 80,
+    "Acoustic Bass": 32,
+    "Synth Bass": 38,
+    "Violin": 40,
+    "Trumpet": 56,
+    "Saxophone": 66,
+    "Drums": 118,
+    "Strings": 48
+}
+
+DEFAULT_SETTINGS = {
+    "tempo": 120,
+    "scale": "major",
+    "root_note": 60,
+    "instruments": {
+        "melody": 5,    # Electric Piano
+        "bass": 38,     # Synth Bass
+        "drums": 118
+    },
+    "fractal_params": {
+        "l_system_iter": 6,
+        "chaos_level": 0.2,
+        "drum_levels": 5
+    },
+    "effects": {
+        "arpeggio": True,
+        "reverb": False,
+        "swing": 0.3,
+        "humanize": 0.2,
+        "melody_volume": 110,
+        "bass_volume": 115,
+        "drums_volume": 127
+    }
+}
+
+def validate_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
+    """Проверка и нормализация настроек"""
+    validated = {}
+    
+    try:
+        # Темп
+        validated['tempo'] = int(settings.get('tempo', DEFAULT_SETTINGS['tempo']))
+        if not 40 <= validated['tempo'] <= 200:
+            raise ValueError("Tempo must be between 40 and 200")
+
+        # Гамма
+        validated['scale'] = str(settings.get('scale', DEFAULT_SETTINGS['scale']))
+        if validated['scale'] not in SCALES:
+            raise ValueError(f"Invalid scale: {validated['scale']}")
+
+        # Основная нота
+        validated['root_note'] = int(settings.get('root_note', DEFAULT_SETTINGS['root_note']))
+        if not 21 <= validated['root_note'] <= 108:  # Диапазон стандартного MIDI-клавиатуры
+            raise ValueError("Root note must be between 21 and 108")
+
+        # Инструменты
+        validated['instruments'] = {}
+        for instr in ['melody', 'bass', 'drums']:
+            instr_val = settings.get('instruments', {}).get(instr, DEFAULT_SETTINGS['instruments'][instr])
+            validated['instruments'][instr] = int(instr_val)
+            if not 0 <= validated['instruments'][instr] <= 127:
+                raise ValueError(f"Instrument {instr} must be between 0 and 127")
+
+        # Фрактальные параметры
+        validated['fractal_params'] = {}
+        fractal_settings = settings.get('fractal_params', {})
+        
+        validated['fractal_params']['l_system_iter'] = int(
+            fractal_settings.get('l_system_iter', DEFAULT_SETTINGS['fractal_params']['l_system_iter'])
+        )
+        if not 3 <= validated['fractal_params']['l_system_iter'] <= 10:
+            raise ValueError("L-system iterations must be between 3 and 10")
+
+        validated['fractal_params']['chaos_level'] = float(
+            fractal_settings.get('chaos_level', DEFAULT_SETTINGS['fractal_params']['chaos_level'])
+        )
+        if not 0 <= validated['fractal_params']['chaos_level'] <= 1:
+            raise ValueError("Chaos level must be between 0 and 1")
+
+        validated['fractal_params']['drum_levels'] = int(
+            fractal_settings.get('drum_levels', DEFAULT_SETTINGS['fractal_params']['drum_levels'])
+        )
+        if not 2 <= validated['fractal_params']['drum_levels'] <= 7:
+            raise ValueError("Drum levels must be between 2 and 7")
+
+        # Эффекты
+        validated['effects'] = {}
+        effects_settings = settings.get('effects', {})
+        
+        validated['effects']['arpeggio'] = bool(
+            effects_settings.get('arpeggio', DEFAULT_SETTINGS['effects']['arpeggio'])
+        )
+        validated['effects']['reverb'] = bool(
+            effects_settings.get('reverb', DEFAULT_SETTINGS['effects']['reverb'])
+        )
+        
+        validated['effects']['swing'] = float(
+            effects_settings.get('swing', DEFAULT_SETTINGS['effects']['swing'])
+        )
+        if not 0 <= validated['effects']['swing'] <= 1:
+            raise ValueError("Swing must be between 0 and 1")
+
+        validated['effects']['humanize'] = float(
+            effects_settings.get('humanize', DEFAULT_SETTINGS['effects']['humanize'])
+        )
+        if not 0 <= validated['effects']['humanize'] <= 1:
+            raise ValueError("Humanize must be between 0 and 1")
+            
+        # Громкость
+        validated['effects']['melody_volume'] = int(settings.get('effects', {}).get('melody_volume', 110))
+        if not 0 <= validated['effects']['melody_volume'] <= 127:
+            raise ValueError("Melody volume must be between 0 and 127")
+            
+        validated['effects']['bass_volume'] = int(settings.get('effects', {}).get('bass_volume', 115))
+        if not 0 <= validated['effects']['bass_volume'] <= 127:
+            raise ValueError("Bass volume must be between 0 and 127")
+            
+        validated['effects']['drums_volume'] = int(settings.get('effects', {}).get('drums_volume', 127))
+        if not 0 <= validated['effects']['drums_volume'] <= 127:
+            raise ValueError("Drums volume must be between 0 and 127")
+
+    except (TypeError, ValueError) as e:
+        app.logger.error(f"Validation error: {str(e)}")
+        raise ValueError(f"Invalid parameter: {str(e)}")
+
+    return validated
+
+def generate_rich_l_system(iterations: int, chaos: float) -> str:
+    """Генератор сложных музыкальных паттернов"""
+    rules = {
+        'A': ['ABAC', 'AABC', 'BAAC', '[A]B'],
+        'B': ['A', 'B', 'C', '[+A][-A]'],
+        'C': ['BB', 'AA', '[-A][+A]', 'D'],
+        'D': ['[+A]', '[-A]', 'B', 'C']
+    }
+    seq = 'A'
+    for _ in range(iterations):
+        new_seq = []
+        for c in seq:
+            if c in rules and random.random() > chaos:
+                new_seq.append(random.choice(rules[c]))
+            else:
+                new_seq.append(c)
+        seq = ''.join(new_seq)
+    return seq
+
+def generate_drum_pattern(levels: int) -> list:
+    """Генератор мощных ударных"""
+    pattern = [1, 0, 0, 1]
+    for _ in range(levels):
+        pattern = pattern + [0] + pattern
+    return pattern
+
+def generate_music(settings: Dict[str, Any]) -> io.BytesIO:
+    """Генерация громкой и выразительной музыки"""
+    try:
+        midi = MIDIFile(3)
+        midi.addTempo(0, 0, settings['tempo'])
+
+        # Установка инструментов
+        midi.addProgramChange(0, 0, 0, settings['instruments']['melody'])
+        midi.addProgramChange(1, 0, 0, settings['instruments']['bass'])
+        
+        # Громкость треков
+        melody_vol = int(settings['effects']['melody_volume'])
+        bass_vol = int(settings['effects']['bass_volume'])
+        drums_vol = int(settings['effects']['drums_volume'])
+        
+        # Генерация мелодии
+        root_note = max(48, settings['root_note'])  # Не ниже C3 (48)
+        scale = SCALES[settings['scale']]
+        melody_notes = [root_note + note for note in scale * 2]
+        
+        l_system_seq = generate_rich_l_system(
+            settings['fractal_params']['l_system_iter'],
+            settings['fractal_params']['chaos_level']
+        )
+        
+        # Добавление выразительной мелодии
+        for i, char in enumerate(l_system_seq[:64]):
+            note_pitch = melody_notes[i % len(melody_notes)]
+            
+            # Динамическая громкость с акцентами
+            velocity = melody_vol - 20 + (i % 4) * 15
+            velocity = int(min(127, max(80, velocity)))
+            
+            # Добавление человеческого фактора
+            if settings['effects']['humanize'] > 0:
+                velocity += int(random.randint(-10, 10) * settings['effects']['humanize'])
+                velocity = int(min(127, max(60, velocity)))
+            
+            duration = 0.25 + (i % 3) * 0.1
+            time = i * 0.25
+            
+            # Применение свинга
+            if settings['effects']['swing'] > 0 and i % 2 == 1:
+                time += 0.1 * settings['effects']['swing']
+            
+            midi.addNote(0, 0, note_pitch, time, duration, int(velocity))
+            
+            # Богатое арпеджио
+            if settings['effects']['arpeggio'] and i % 4 == 0:
+                chord_notes = [note_pitch, note_pitch + 4, note_pitch + 7]
+                for j, chord_note in enumerate(chord_notes):
+                    midi.addNote(0, 0, min(127, chord_note), 
+                               time + 0.1 * (j + 1), 
+                               duration * 0.8, 
+                               max(60, velocity - 15))
+        
+        # Мощная басовая линия
+        bass_notes = [
+            settings['root_note'] - 12,
+            settings['root_note'] - 10,
+            settings['root_note'] - 8,
+            settings['root_note'] - 5
+        ]
+        for step in range(0, 32):
+            note = bass_notes[(step ** 2) % len(bass_notes)]
+            velocity = bass_vol - 20 + (step % 4) * 10
+            midi.addNote(1, 0, note, step * 0.25, 0.5, velocity)
+        
+        # Ударные
+        drum_pattern = generate_drum_pattern(settings['fractal_params']['drum_levels'])
+        for step in range(32):
+            if drum_pattern[step % len(drum_pattern)]:
+                # Kick
+                midi.addNote(2, 9, 35, step * 0.125, 0.1, int(drums_vol))
+                
+                # Snare
+                if step % 4 == 2:
+                    midi.addNote(2, 9, 38, step * 0.125 + 0.05, 0.1, int(drums_vol - 10))
+                
+                # Hi-hat
+                if step % 2 == 1:
+                    midi.addNote(2, 9, 42, step * 0.125, 0.05, int(drums_vol - 20))
+        
+        midi_data = io.BytesIO()
+        midi.writeFile(midi_data)
+        midi_data.seek(0)
+        return midi_data
+        
+    except Exception as e:
+        app.logger.error(f"Music generation error: {str(e)}", exc_info=True)
+        raise RuntimeError("Failed to generate music")
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/api/settings')
+def get_settings():
+    try:
+        return jsonify({
+            "success": True,
+            "scales": list(SCALES.keys()),
+            "instruments": INSTRUMENTS,
+            "default_settings": DEFAULT_SETTINGS
+        })
+    except Exception as e:
+        app.logger.error(f"Settings error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to load settings"
+        }), 500
+
+@app.route('/api/generate', methods=['POST'])
+def generate():
+    try:
+        app.logger.debug(f"Received request: {request.data}")
+        if not request.is_json:
+            app.logger.error("Request is not JSON")
+            return jsonify({
+                "success": False,
+                "error": "Request must be JSON"
+            }), 400
+            
+        request_data = request.get_json()
+        if not request_data:
+            app.logger.error("No data provided")
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+        
+        # Логируем полученные данные для отладки
+        app.logger.debug(f"Received data: {request_data}")
+        
+        try:
+            settings = validate_settings(request_data.get('settings', {}))
+        except ValueError as e:
+            app.logger.error(f"Settings validation failed: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 400
+            
+        try:
+            midi_data = generate_music(settings)
+        except Exception as e:
+            app.logger.error(f"Music generation failed: {str(e)}", exc_info=True)
+            return jsonify({
+                "success": False,
+                "error": "Failed to generate music"
+            }), 500
+        
+        return send_file(
+            midi_data,
+            mimetype='audio/midi',
+            as_attachment=True,
+            download_name='fractal_music.mid'
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Unexpected error in generate endpoint: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": "Internal server error"
+        }), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Фрактальный генератор музыки</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🎵 Фрактальный генератор музыки</h1>
+            <p class="subtitle">Создавайте уникальные композиции с помощью математических алгоритмов</p>
+        </header>
+
+        <main class="main-content">
+            <div class="settings-panel">
+                <div class="settings-group">
+                    <h2><i class="icon-settings"></i> Основные настройки</h2>
+                    <div class="control">
+                        <label for="tempo">Темп (BPM):</label>
+                        <input type="range" id="tempo" min="40" max="200" value="120">
+                        <span id="tempo-value">120</span>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="root-note">Тональность:</label>
+                        <input type="range" id="root-note" min="48" max="72" value="60">
+                        <span id="root-note-value">60</span> 
+                    </div>
+                    
+                    <div class="control">
+                        <label for="scale">Гамма:</label>
+                        <select id="scale" class="select-box"></select>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h2><i class="icon-instruments"></i> Инструменты</h2>
+                    <div class="control">
+                        <label for="melody-instr">Мелодия:</label>
+                        <select id="melody-instr" class="select-box"></select>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="bass-instr">Бас:</label>
+                        <select id="bass-instr" class="select-box"></select>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="drum-instr">Ударные:</label>
+                        <select id="drum-instr" class="select-box"></select>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h2><i class="icon-fractal"></i> Фрактальные параметры</h2>
+                    <div class="control">
+                        <label for="l-system-iter">Сложность мелодии:</label>
+                        <input type="range" id="l-system-iter" min="3" max="8" value="5">
+                        <span id="l-system-iter-value">5</span>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="chaos-level">Уровень хаоса:</label>
+                        <input type="range" id="chaos-level" min="0" max="100" value="30">
+                        <span id="chaos-level-value">30%</span>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="drum-levels">Сложность ударных:</label>
+                        <input type="range" id="drum-levels" min="2" max="6" value="4">
+                        <span id="drum-levels-value">4</span>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h2><i class="icon-effects"></i> Эффекты</h2>
+                    <div class="control checkbox">
+                        <input type="checkbox" id="arpeggio" checked>
+                        <label for="arpeggio">Арпеджио</label>
+                    </div>
+                    
+                    <div class="control checkbox">
+                        <input type="checkbox" id="reverb">
+                        <label for="reverb">Реверберация</label>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="swing">Свинг:</label>
+                        <input type="range" id="swing" min="0" max="100" value="20">
+                        <span id="swing-value">20%</span>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="humanize">Оживление:</label>
+                        <input type="range" id="humanize" min="0" max="100" value="10">
+                        <span id="humanize-value">10%</span>
+                    </div>
+
+                    <div class="control">
+                        <label for="melody-vol">Громкость мелодии:</label>
+                        <input type="range" id="melody-vol" min="0" max="127" value="110">
+                        <span id="melody-vol-value">110</span>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="bass-vol">Громкость баса:</label>
+                        <input type="range" id="bass-vol" min="0" max="127" value="115">
+                        <span id="bass-vol-value">115</span>
+                    </div>
+                    
+                    <div class="control">
+                        <label for="drums-vol">Громкость ударных:</label>
+                        <input type="range" id="drums-vol" min="0" max="127" value="127">
+                        <span id="drums-vol-value">127</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="visualization">
+                <div class="fractal-display">
+                    <canvas id="fractal-canvas"></canvas>
+                </div>
+                
+                <div class="controls">
+                    <button id="generate-btn" class="generate-btn">
+                        <span class="btn-icon">🎵</span>
+                        <span class="btn-text">Сгенерировать музыку</span>
+                    </button>
+                    <div id="status-message" class="status-message"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>Фрактальный генератор музыки © 2025 | Использует Python, Flask и MIDIUtil</p>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
+
+style.css
+:root {
+    --primary-color: #4a6fa5;
+    --secondary-color: #166088;
+    --accent-color: #4fc3f7;
+    --background-color: #f5f7fa;
+    --card-color: #ffffff;
+    --text-color: #2d3748;
+    --text-light: #718096;
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    padding: 0;
+    margin: 0;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header h1 {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: var(--text-light);
+    font-size: 1.1rem;
+    font-weight: 300;
+}
+
+.main-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+.settings-panel {
+    flex: 1;
+    min-width: 300px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.settings-group {
+    background-color: var(--card-color);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+}
+
+.settings-group h2 {
+    font-size: 1.2rem;
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control {
+    margin-bottom: 15px;
+}
+
+.control label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.select-box {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: white;
+    font-size: 1rem;
+    color: var(--text-color);
+}
+
+input[type="range"] {
+    width: 100%;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    outline: none;
+    margin: 10px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    background: var(--secondary-color);
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.checkbox input {
+    width: auto;
+}
+
+.visualization {
+    flex: 2;
+    min-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.fractal-display {
+    width: 100%;
+    height: 500px; /* Увеличено с 300px */
+    background-color: var(--card-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+#fractal-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.generate-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+    margin-top: 10px;
+}
+
+.generate-btn:hover {
+    background-color: var(--secondary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.generate-btn:disabled {
+    background-color: var(--text-light);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.status-message {
+    height: 20px;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.status-message.error {
+    color: #e53e3e;
+}
+
+.status-message.success {
+    color: #38a169;
+}
+
+.footer {
+    text-align: center;
+    margin-top: auto;
+    padding: 20px 0;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+    }
+    
+    .settings-panel, .visualization {
+        min-width: 100%;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+}
+
+script.js
+document.addEventListener('DOMContentLoaded', async () => {
+    // Состояние приложения
+    const state = {
+        settings: {},
+        isLoading: false,
+        isInitialized: false
+    };
+
+    // DOM элементы
+    const elements = {
+        // Основные настройки
+        tempo: document.getElementById('tempo'),
+        tempoValue: document.getElementById('tempo-value'),
+        rootNote: document.getElementById('root-note'),
+        rootNoteValue: document.getElementById('root-note-value'),
+        scale: document.getElementById('scale'),
+        
+        // Инструменты
+        melodyInstr: document.getElementById('melody-instr'),
+        bassInstr: document.getElementById('bass-instr'),
+        drumInstr: document.getElementById('drum-instr'),
+        
+        // Фрактальные параметры
+        lSystemIter: document.getElementById('l-system-iter'),
+        lSystemIterValue: document.getElementById('l-system-iter-value'),
+        chaosLevel: document.getElementById('chaos-level'),
+        chaosLevelValue: document.getElementById('chaos-level-value'),
+        drumLevels: document.getElementById('drum-levels'),
+        drumLevelsValue: document.getElementById('drum-levels-value'),
+        
+        // Эффекты
+        arpeggio: document.getElementById('arpeggio'),
+        reverb: document.getElementById('reverb'),
+        swing: document.getElementById('swing'),
+        swingValue: document.getElementById('swing-value'),
+        humanize: document.getElementById('humanize'),
+        humanizeValue: document.getElementById('humanize-value'),
+        
+        // Громкость
+        melodyVol: document.getElementById('melody-vol'),
+        melodyVolValue: document.getElementById('melody-vol-value'),
+        bassVol: document.getElementById('bass-vol'),
+        bassVolValue: document.getElementById('bass-vol-value'),
+        drumsVol: document.getElementById('drums-vol'),
+        drumsVolValue: document.getElementById('drums-vol-value'),
+        
+        // Управление
+        generateBtn: document.getElementById('generate-btn'),
+        statusMessage: document.getElementById('status-message')
+    };
+
+    // Проверка наличия всех элементов в DOM
+    function checkElements() {
+        for (const [key, element] of Object.entries(elements)) {
+            if (!element) {
+                console.error(`Element not found: ${key}`);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Инициализация приложения
+    async function initApp() {
+        try {
+            if (!checkElements()) {
+                throw new Error("Не удалось найти все необходимые элементы на странице");
+            }
+
+            setLoading(true);
+            showStatus("Загрузка настроек...");
+            
+            const response = await fetchWithTimeout('/api/settings', {
+                timeout: 5000
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || "Неизвестная ошибка");
+            }
+            
+            // Сохраняем настройки
+            state.settings = data.default_settings || {};
+            state.scales = data.scales || [];
+            state.instruments = data.instruments || {};
+            
+            // Инициализация интерфейса
+            initScaleSelect();
+            initInstrumentSelects();
+            setDefaultValues();
+            setupEventListeners();
+            
+            // Отрисовка начального фрактала
+            drawFractal(state.settings);
+            
+            state.isInitialized = true;
+            showStatus("Готово к генерации музыки!", "success");
+        } catch (error) {
+            console.error("Ошибка инициализации:", error);
+            showStatus(`Ошибка: ${error.message}`, "error");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Функция fetch с таймаутом
+    async function fetchWithTimeout(resource, options = {}) {
+        const { timeout = 8000 } = options;
+        
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal  
+        }).catch(() => {
+            throw new Error("Превышено время ожидания сервера");
+        });
+        
+        clearTimeout(id);
+        return response;
+    }
+
+    // Инициализация элементов интерфейса
+    function initScaleSelect() {
+        if (!elements.scale) return;
+        
+        elements.scale.innerHTML = '';
+        state.scales.forEach(scale => {
+            const option = document.createElement('option');
+            option.value = scale;
+            option.textContent = scale.charAt(0).toUpperCase() + scale.slice(1);
+            elements.scale.appendChild(option);
+        });
+    }
+
+    function initInstrumentSelects() {
+        initInstrumentSelect(elements.melodyInstr);
+        initInstrumentSelect(elements.bassInstr);
+        initInstrumentSelect(elements.drumInstr);
+    }
+
+    function initInstrumentSelect(selectElement) {
+        if (!selectElement) return;
+        
+        selectElement.innerHTML = '';
+        for (const [name, value] of Object.entries(state.instruments)) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = name;
+            selectElement.appendChild(option);
+        }
+    }
+
+    // Установка значений по умолчанию
+    function setDefaultValues() {
+        // Основные настройки
+        safeSetControlValue(elements.tempo, elements.tempoValue, state.settings.tempo, 120);
+        safeSetControlValue(elements.rootNote, elements.rootNoteValue, state.settings.root_note, 60);
+        safeSetControlValue(elements.scale, null, state.settings.scale, 'major');
+        
+        // Инструменты
+        safeSetControlValue(elements.melodyInstr, null, state.settings.instruments?.melody, 5);
+        safeSetControlValue(elements.bassInstr, null, state.settings.instruments?.bass, 38);
+        safeSetControlValue(elements.drumInstr, null, state.settings.instruments?.drums, 118);
+        
+        // Фрактальные параметры
+        safeSetControlValue(elements.lSystemIter, elements.lSystemIterValue, 
+                       state.settings.fractal_params?.l_system_iter, 6);
+        safeSetControlValue(elements.chaosLevel, elements.chaosLevelValue, 
+                       (state.settings.fractal_params?.chaos_level || 0.2) * 100, 20);
+        safeSetControlValue(elements.drumLevels, elements.drumLevelsValue, 
+                       state.settings.fractal_params?.drum_levels, 5);
+        
+        // Эффекты
+        safeSetControlValue(elements.arpeggio, null, state.settings.effects?.arpeggio, true);
+        safeSetControlValue(elements.reverb, null, state.settings.effects?.reverb, false);
+        safeSetControlValue(elements.swing, elements.swingValue, 
+                       (state.settings.effects?.swing || 0.3) * 100, 30);
+        safeSetControlValue(elements.humanize, elements.humanizeValue, 
+                       (state.settings.effects?.humanize || 0.2) * 100, 20);
+        
+        // Громкость
+        safeSetControlValue(elements.melodyVol, elements.melodyVolValue, 
+                       state.settings.effects?.melody_volume, 110);
+        safeSetControlValue(elements.bassVol, elements.bassVolValue, 
+                       state.settings.effects?.bass_volume, 115);
+        safeSetControlValue(elements.drumsVol, elements.drumsVolValue, 
+                       state.settings.effects?.drums_volume, 127);
+    }
+
+    function safeSetControlValue(element, displayElement, value, defaultValue) {
+        if (!element) {
+            console.error('Element not found for value setting');
+            return;
+        }
+        
+        const finalValue = value !== undefined ? value : defaultValue;
+        
+        if (element.type === 'checkbox') {
+            element.checked = Boolean(finalValue);
+        } else if (element.tagName === 'SELECT') {
+            element.value = finalValue;
+        } else if (element.tagName === 'INPUT') {
+            element.value = finalValue;
+        }
+        
+        if (displayElement) {
+            displayElement.textContent = finalValue;
+        }
+    }
+
+    // Генерация музыки
+    async function generateMusic() {
+        if (!state.isInitialized || state.isLoading) return;
+        
+        try {
+            setLoading(true);
+            showStatus("Генерация музыки...");
+            
+            // Подготовка настроек
+            const settings = {
+                tempo: getValidNumber(elements.tempo?.value, 120, 40, 200),
+                root_note: getValidNumber(elements.rootNote?.value, 60, 48, 72),
+                scale: elements.scale?.value || 'major',
+                instruments: {
+                    melody: getValidNumber(elements.melodyInstr?.value, 5, 0, 127),
+                    bass: getValidNumber(elements.bassInstr?.value, 38, 0, 127),
+                    drums: getValidNumber(elements.drumInstr?.value, 118, 0, 127)
+                },
+                fractal_params: {
+                    l_system_iter: getValidNumber(elements.lSystemIter?.value, 6, 3, 10),
+                    chaos_level: getValidNumber(elements.chaosLevel?.value, 20, 0, 100) / 100,
+                    drum_levels: getValidNumber(elements.drumLevels?.value, 5, 2, 7)
+                },
+                effects: {
+                    arpeggio: elements.arpeggio?.checked || true,
+                    reverb: elements.reverb?.checked || false,
+                    swing: getValidNumber(elements.swing?.value, 30, 0, 100) / 100,
+                    humanize: getValidNumber(elements.humanize?.value, 20, 0, 100) / 100,
+                    melody_volume: getValidNumber(elements.melodyVol?.value, 110, 0, 127),
+                    bass_volume: getValidNumber(elements.bassVol?.value, 115, 0, 127),
+                    drums_volume: getValidNumber(elements.drumsVol?.value, 127, 0, 127)
+                }
+            };
+
+            drawFractal(settings);
+            
+            // Логируем настройки для отладки
+            console.log("Sending settings:", settings);
+            
+            // Отправка запроса
+            const response = await fetchWithTimeout('/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ settings }),
+                timeout: 15000
+            });
+            
+            // Обработка ответа
+            if (!response.ok) {
+                let errorMsg = "Ошибка сервера";
+                try {
+                    const errorData = await response.json();
+                    errorMsg = errorData.error || errorMsg;
+                } catch (e) {
+                    console.error("Failed to parse error response:", e);
+                }
+                throw new Error(errorMsg);
+            }
+            
+            // Скачивание файла
+            const blob = await response.blob();
+            downloadBlob(blob, 'fractal_music.mid');
+            
+            showStatus("Музыка успешно сгенерирована!", "success");
+        } catch (error) {
+            console.error("Ошибка генерации:", error);
+            showStatus(`Ошибка: ${error.message}`, "error");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Вспомогательные функции
+    function getValidNumber(value, defaultValue, min, max) {
+        const num = Number(value);
+        return isNaN(num) ? defaultValue : Math.min(Math.max(num, min), max);
+    }
+
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function setLoading(isLoading) {
+        state.isLoading = isLoading;
+        if (elements.generateBtn) {
+            elements.generateBtn.disabled = isLoading;
+            elements.generateBtn.innerHTML = isLoading 
+                ? '<span class="btn-icon">⏳</span> Генерация...' 
+                : '<span class="btn-icon">🎵</span> Сгенерировать музыку';
+        }
+    }
+
+    function showStatus(message, type = "") {
+        if (elements.statusMessage) {
+            elements.statusMessage.textContent = message;
+            elements.statusMessage.className = `status-message ${type}`;
+        }
+    }
+
+    // Назначение обработчиков событий
+    function setupEventListeners() {
+        // Обновление значений ползунков
+        const connectSliderToDisplay = (slider, display) => {
+            if (slider && display) {
+                console.log(`Connecting slider: ${slider.id} to display: ${display.id}`);
+                slider.addEventListener('input', () => {
+                    console.log(`Slider ${slider.id} changed to: ${slider.value}`);
+                    display.textContent = slider.value;
+                });
+            } else {
+                console.error('Slider or display element not found', {slider, display});
+            }
+        };
+
+        const fractalParams = [
+            elements.lSystemIter,
+            elements.chaosLevel,
+            elements.scale
+        ];
+        
+        fractalParams.forEach(element => {setDefaultValues()
+            if (element) {
+                element.addEventListener('input', () => {
+                    const settings = getCurrentSettings();
+                    drawFractal(settings);
+                });
+            }
+        });
+
+        connectSliderToDisplay(elements.tempo, elements.tempoValue);
+        connectSliderToDisplay(elements.lSystemIter, elements.lSystemIterValue);
+        connectSliderToDisplay(elements.chaosLevel, elements.chaosLevelValue);
+        connectSliderToDisplay(elements.drumLevels, elements.drumLevelsValue);
+        connectSliderToDisplay(elements.swing, elements.swingValue);
+        connectSliderToDisplay(elements.humanize, elements.humanizeValue);
+        connectSliderToDisplay(elements.melodyVol, elements.melodyVolValue);
+        connectSliderToDisplay(elements.bassVol, elements.bassVolValue);
+        connectSliderToDisplay(elements.drumsVol, elements.drumsVolValue);
+        connectSliderToDisplay(elements.rootNote, elements.rootNoteValue);
+        
+        // Кнопка генерации
+        if (elements.generateBtn) {
+            elements.generateBtn.addEventListener('click', generateMusic);
+        }
+    }
+
+    function getCurrentSettings() {
+        return {
+            tempo: getValidNumber(elements.tempo?.value, 120, 40, 200),
+            root_note: getValidNumber(elements.rootNote?.value, 60, 48, 72),
+            scale: elements.scale?.value || 'major',
+            instruments: {
+                melody: getValidNumber(elements.melodyInstr?.value, 5, 0, 127),
+                bass: getValidNumber(elements.bassInstr?.value, 38, 0, 127),
+                drums: getValidNumber(elements.drumInstr?.value, 118, 0, 127)
+            },
+            fractal_params: {
+                l_system_iter: getValidNumber(elements.lSystemIter?.value, 6, 3, 10),
+                chaos_level: getValidNumber(elements.chaosLevel?.value, 20, 0, 100) / 100,
+                drum_levels: getValidNumber(elements.drumLevels?.value, 5, 2, 7)
+            },
+            effects: {
+                arpeggio: elements.arpeggio?.checked || true,
+                reverb: elements.reverb?.checked || false,
+                swing: getValidNumber(elements.swing?.value, 30, 0, 100) / 100,
+                humanize: getValidNumber(elements.humanize?.value, 20, 0, 100) / 100,
+                melody_volume: getValidNumber(elements.melodyVol?.value, 110, 0, 127),
+                bass_volume: getValidNumber(elements.bassVol?.value, 115, 0, 127),
+                drums_volume: getValidNumber(elements.drumsVol?.value, 127, 0, 127)
+            }
+        };
+    }
+
+    function drawFractal(settings) {
+        const canvas = document.getElementById('fractal-canvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        
+        // Очищаем canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Параметры для отрисовки
+        const iterations = settings.fractal_params.l_system_iter;
+        const chaos = settings.fractal_params.chaos_level;
+        const scale = settings.scale;
+        
+        // Генерируем L-систему
+        const lSystemSeq = generateLSystemForVisualization(iterations, chaos);
+        
+        // Отрисовываем фрактал
+        drawLSystem(ctx, lSystemSeq, canvas.width, canvas.height);
+    }
+
+    function generateLSystemForVisualization(iterations, chaos) {
+        // Упрощенная версия для визуализации
+        const rules = {
+            'F': ['F[+F]F[-F]F', 'F[+F]F', 'F[-F]F', 'FF+[+F-F-F]-[-F+F+F]']
+        };
+        let seq = 'F';
+        
+        for (let i = 0; i < iterations; i++) {
+            let newSeq = '';
+            for (const c of seq) {
+                if (c in rules && Math.random() > chaos) {
+                    newSeq += rules[c][Math.floor(Math.random() * rules[c].length)];
+                } else {
+                    newSeq += c;
+                }
+            }
+            seq = newSeq;
+        }
+        return seq;
+    }
+
+    function drawLSystem(ctx, sequence, width, height) {
+        const len = 5;
+        let angle = Math.PI / 4;
+        let x = width / 2;
+        let y = height;
+        let a = -Math.PI / 2; // Начинаем рисовать вверх
+        let stack = [];
+        
+        ctx.strokeStyle = '#4a6fa5';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        for (const c of sequence) {
+            switch (c) {
+                case 'F':
+                    x += len * Math.cos(a);
+                    y += len * Math.sin(a);
+                    ctx.lineTo(x, y);
+                    break;
+                case '+':
+                    a += angle;
+                    break;
+                case '-':
+                    a -= angle;
+                    break;
+                case '[':
+                    stack.push({x, y, a});
+                    break;
+                case ']':
+                    const state = stack.pop();
+                    if (state) {
+                        x = state.x;
+                        y = state.y;
+                        a = state.a;
+                        ctx.moveTo(x, y);
+                    }
+                    break;
+            }
+        }
+        
+        ctx.stroke();
+    }
+
+    // Запуск приложения
+    initApp();
+});
