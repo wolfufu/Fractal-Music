@@ -5,8 +5,21 @@ import random
 import logging
 from typing import Dict, Any
 
+import subprocess
+import tempfile
+import os
+import traceback
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG)
+
+FLUIDSYNTH_PATH = r"c:\tools\fluidsynth\bin\fluidsynth.exe"
+SOUNDFONT_PATH = r"c:\tools\soundfonts\FluidR3_GM.sf2"
 
 # Конфигурация
 SCALES = {
@@ -54,6 +67,37 @@ DEFAULT_SETTINGS = {
         "drums_volume": 127
     }
 }
+
+def convert_midi_to_wav(midi_data: io.BytesIO, soundfont_path: str, fluidsynth_path: str) -> io.BytesIO:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mid") as temp_midi_file:
+        temp_midi_file.write(midi_data.read())
+        temp_midi_file.flush()
+        midi_path = temp_midi_file.name
+
+    wav_fd, wav_path = tempfile.mkstemp(suffix=".wav")
+    os.close(wav_fd)
+
+    try:
+        cmd = [
+            fluidsynth_path,
+            "-ni",
+            soundfont_path,
+            midi_path,
+            "-F", wav_path,
+            "-r", "44100"
+        ]
+        subprocess.run(cmd, check=True)
+
+        with open(wav_path, "rb") as f:
+            wav_data = io.BytesIO(f.read())
+
+        wav_data.seek(0)
+        return wav_data
+    finally:
+        os.remove(midi_path)
+        os.remove(wav_path)
+
+
 
 def validate_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     """Проверка и нормализация настроек"""
@@ -308,29 +352,27 @@ def generate():
         app.logger.debug(f"Received data: {request_data}")
         
         try:
-            settings = validate_settings(request_data.get('settings', {}))
-        except ValueError as e:
-            app.logger.error(f"Settings validation failed: {str(e)}")
+            data = request.get_json()
+            settings = data["settings"]
+            app.logger.debug(f"Parsed settings: {settings}")
+
+            midi_data = generate_music(settings)
+            wav_data = convert_midi_to_wav(midi_data, SOUNDFONT_PATH, FLUIDSYNTH_PATH)
+
+            return send_file(
+                wav_data,
+                mimetype='audio/wav',
+                as_attachment=False,
+                download_name='fractal_music.wav'
+            )
+
+        except Exception as e:
+            app.logger.error("Error during generation:\n" + traceback.format_exc())
             return jsonify({
                 "success": False,
                 "error": str(e)
-            }), 400
-            
-        try:
-            midi_data = generate_music(settings)
-        except Exception as e:
-            app.logger.error(f"Music generation failed: {str(e)}", exc_info=True)
-            return jsonify({
-                "success": False,
-                "error": "Failed to generate music"
             }), 500
-        
-        return send_file(
-            midi_data,
-            mimetype='audio/midi',
-            as_attachment=True,
-            download_name='fractal_music.mid'
-        )
+
         
     except Exception as e:
         app.logger.error(f"Unexpected error in generate endpoint: {str(e)}", exc_info=True)

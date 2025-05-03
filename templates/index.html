@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Фрактальный генератор музыки</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Фрактальный генератор музыки</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>🎵 Фрактальный генератор музыки</h1>
-            <p class="subtitle">Создавайте уникальные композиции с помощью математических алгоритмов</p>
-        </header>
+  <div class="container">
+    <header class="header">
+      <h1>🎵 Фрактальный генератор музыки</h1>
+      <p class="subtitle">Создавайте уникальные композиции с помощью математических алгоритмов</p>
+    </header>
 
         <main class="main-content">
             <div class="settings-panel">
@@ -126,19 +126,21 @@
                 
                 <div class="controls">
                     <button id="generate-btn" class="generate-btn">
-                        <span class="btn-icon">🎵</span>
-                        <span class="btn-text">Сгенерировать музыку</span>
+                      <span class="btn-icon">🎵</span>
+                      <span class="btn-text">Сгенерировать музыку</span>
                     </button>
                     <div id="status-message" class="status-message"></div>
-                </div>
-            </div>
-        </main>
+                    <audio id="midi-player" controls style="display: none; margin-top: 20px;"></audio>
+                  </div>
+                </main>
+            
+                <footer class="footer">
+                  <p>Фрактальный генератор музыки © 2025 | Использует Python, Flask и MIDIUtil</p>
+                </footer>
+              </div>
+            
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/MIDI.js/0.3.1/MIDI.min.js"></script>
+              <script type="module" src="/static/script.js"></script>
 
-        <footer class="footer">
-            <p>Фрактальный генератор музыки © 2025 | Использует Python, Flask и MIDIUtil</p>
-        </footer>
-    </div>
-
-    <script src="/static/script.js"></script>
 </body>
 </html>

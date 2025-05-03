@@ -1,3 +1,73 @@
+import { playMidi } from './audio-player.js';
+
+console.log("script.js loaded");
+
+function connectSliderToDisplay(sliderId, displayId) {
+    const slider = document.getElementById(sliderId);
+    const display = document.getElementById(displayId);
+    if (slider && display) {
+        display.textContent = slider.value;
+        slider.addEventListener('input', () => {
+            display.textContent = slider.value;
+        });
+        console.log(`Connecting slider: ${sliderId} to display: ${displayId}`);
+    }
+}
+
+// Подключаем слайдеры
+["tempo", "l-system-iter", "chaos-level", "drum-levels", "swing", "humanize",
+ "melody-vol", "bass-vol", "drums-vol", "root-note"].forEach(id => {
+    connectSliderToDisplay(id, `${id}-value`);
+});
+
+async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 30000 } = options; // Увеличено до 30 секунд
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (err) {
+        clearTimeout(id);
+        throw new Error("Превышено время ожидания сервера");
+    }
+}
+
+document.getElementById("generate-btn").addEventListener("click", async function generateMusic() {
+    const btn = this;
+    btn.textContent = "Генерация...";
+
+    const settings = getCurrentSettings(); 
+    console.log("Sending settings:", settings);
+
+    try {
+        const response = await fetchWithTimeout('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ settings }),
+            timeout: 30000
+        });
+
+        if (!response.ok) {
+            throw new Error("Ошибка генерации: " + response.statusText);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        console.log("MIDI data received, length:", arrayBuffer.byteLength);
+
+        await playMidi(arrayBuffer);
+    } catch (err) {
+        console.error("Ошибка генерации:", err);
+        alert("Ошибка: " + err.message);
+    } finally {
+        btn.textContent = "Сгенерировать";
+    }
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Состояние приложения
     const state = {
@@ -396,6 +466,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         };
     }
+
+    window.getCurrentSettings = getCurrentSettings;
 
     function drawFractal(settings) {
         const canvas = document.getElementById('fractal-canvas');
