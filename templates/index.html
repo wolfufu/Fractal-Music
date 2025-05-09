@@ -1,146 +1,54 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Фрактальный генератор музыки</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>Фрактальная музыка и визуализация</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <header class="header">
-      <h1>🎵 Фрактальный генератор музыки</h1>
-      <p class="subtitle">Создавайте уникальные композиции с помощью математических алгоритмов</p>
-    </header>
+<body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col items-center justify-start pt-10">
+  <a href="/custom" class="absolute top-4 right-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+    Расширенные настройки
+  </a>
+  <h1 class="text-3xl font-bold mb-6">🎵 Фрактальная Музыка & Визуализация 🌿</h1>
 
-        <main class="main-content">
-            <div class="settings-panel">
-                <div class="settings-group">
-                    <h2><i class="icon-settings"></i> Основные настройки</h2>
-                    <div class="control">
-                        <label for="tempo">Темп (BPM):</label>
-                        <input type="range" id="tempo" min="40" max="200" value="120">
-                        <span id="tempo-value">120</span>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="root-note">Тональность:</label>
-                        <input type="range" id="root-note" min="48" max="72" value="60">
-                        <span id="root-note-value">60</span> 
-                    </div>
-                    
-                    <div class="control">
-                        <label for="scale">Гамма:</label>
-                        <select id="scale" class="select-box"></select>
-                    </div>
-                </div>
+  <canvas id="fractal-canvas" width="800" height="500" class="border border-gray-700"></canvas>
+  <div class="flex flex-col items-center space-y-4 mb-6">
+    <label>Фрактал:</label>
+    <select id="fractal-type" class="bg-gray-800 text-white px-2 py-1 rounded">
+        <option value="tree">Дерево</option>
+        <option value="koch">Кривая Коха</option>
+        <option value="sierpinski">Серпинский треугольник</option>
+        <option value="carpet">Ковер Серпинского</option>
+    </select>
+      
 
-                <div class="settings-group">
-                    <h2><i class="icon-instruments"></i> Инструменты</h2>
-                    <div class="control">
-                        <label for="melody-instr">Мелодия:</label>
-                        <select id="melody-instr" class="select-box"></select>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="bass-instr">Бас:</label>
-                        <select id="bass-instr" class="select-box"></select>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="drum-instr">Ударные:</label>
-                        <select id="drum-instr" class="select-box"></select>
-                    </div>
-                </div>
+    <label>Глубина фрактала: <span id="depth-value">3</span></label>
+    <input type="range" id="depth" min="1" max="6" value="3" class="w-64">
 
-                <div class="settings-group">
-                    <h2><i class="icon-fractal"></i> Фрактальные параметры</h2>
-                    <div class="control">
-                        <label for="l-system-iter">Сложность мелодии:</label>
-                        <input type="range" id="l-system-iter" min="3" max="8" value="5">
-                        <span id="l-system-iter-value">5</span>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="chaos-level">Уровень хаоса:</label>
-                        <input type="range" id="chaos-level" min="0" max="100" value="30">
-                        <span id="chaos-level-value">30%</span>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="drum-levels">Сложность ударных:</label>
-                        <input type="range" id="drum-levels" min="2" max="6" value="4">
-                        <span id="drum-levels-value">4</span>
-                    </div>
-                </div>
+    <label>Скорость: <span id="speed-value">4n</span></label>
+    <select id="speed" class="bg-gray-800 text-white px-2 py-1 rounded">
+      <option value="8n">Быстро</option>
+      <option value="4n" selected>Средне</option>
+      <option value="2n">Медленно</option>
+    </select>
 
-                <div class="settings-group">
-                    <h2><i class="icon-effects"></i> Эффекты</h2>
-                    <div class="control checkbox">
-                        <input type="checkbox" id="arpeggio" checked>
-                        <label for="arpeggio">Арпеджио</label>
-                    </div>
-                    
-                    <div class="control checkbox">
-                        <input type="checkbox" id="reverb">
-                        <label for="reverb">Реверберация</label>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="swing">Свинг:</label>
-                        <input type="range" id="swing" min="0" max="100" value="20">
-                        <span id="swing-value">20%</span>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="humanize">Оживление:</label>
-                        <input type="range" id="humanize" min="0" max="100" value="10">
-                        <span id="humanize-value">10%</span>
-                    </div>
+    <label>Гамма:</label>
+    <select id="scale" class="bg-gray-800 text-white px-2 py-1 rounded">
+      <option value="C4,E4,G4,B4">C мажор</option>
+      <option value="D4,F4,A4,C5">D минор</option>
+      <option value="G3,B3,D4,F#4">G мажор</option>
+    </select>
 
-                    <div class="control">
-                        <label for="melody-vol">Громкость мелодии:</label>
-                        <input type="range" id="melody-vol" min="0" max="127" value="110">
-                        <span id="melody-vol-value">110</span>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="bass-vol">Громкость баса:</label>
-                        <input type="range" id="bass-vol" min="0" max="127" value="115">
-                        <span id="bass-vol-value">115</span>
-                    </div>
-                    
-                    <div class="control">
-                        <label for="drums-vol">Громкость ударных:</label>
-                        <input type="range" id="drums-vol" min="0" max="127" value="127">
-                        <span id="drums-vol-value">127</span>
-                    </div>
-                </div>
-            </div>
+    <div class="space-x-4 mt-4">
+      <button onclick="startMusic()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">▶ Старт</button>
+      <button onclick="stopMusic()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">⏹ Стоп</button>
+    </div>
+  </div>
 
-            <div class="visualization">
-                <div class="fractal-display">
-                    <canvas id="fractal-canvas"></canvas>
-                </div>
-                
-                <div class="controls">
-                    <button id="generate-btn" class="generate-btn">
-                      <span class="btn-icon">🎵</span>
-                      <span class="btn-text">Сгенерировать музыку</span>
-                    </button>
-                    <div id="status-message" class="status-message"></div>
-                    <audio id="midi-player" controls style="display: none; margin-top: 20px;"></audio>
-                  </div>
-                </main>
-            
-                <footer class="footer">
-                  <p>Фрактальный генератор музыки © 2025 | Использует Python, Flask и MIDIUtil</p>
-                </footer>
-              </div>
-            
-              <script src="https://cdnjs.cloudflare.com/ajax/libs/MIDI.js/0.3.1/MIDI.min.js"></script>
-              <script type="module" src="/static/script.js"></script>
+  <div id="canvas-container" class="border border-gray-700"></div>
 
+  <script src="/static/sketch.js"></script>
+  <script src="/static/music.js"></script>
 </body>
 </html>
