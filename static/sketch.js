@@ -29,12 +29,12 @@ function drawFractal(depth, type) {
     ctx.restore();
   } else if (type === "koch") {
     drawKochSnowflake(depth);
-  } else if (type === "sierpinski") {
-    ctx.fillStyle = "white";
-    drawSierpinskiTriangle(400, 50, 100, 450, 700, 450, depth);
-  } else if (type === "carpet") {
-    ctx.fillStyle = "white";
-    drawSierpinskiCarpet(150, 100, 500, depth);
+  } else if (type === "mandelbrot") {
+    drawMandelbrot();
+  } else if (type === "dragon") {
+      drawDragon(currentDepth);
+  } else if (type === "barnsley") {
+      drawBarnsleyFern();
   }
   
 }
@@ -96,47 +96,105 @@ function drawKochLine(x1, y1, x5, y5, depth) {
   drawKochLine(x4, y4, x5, y5, depth - 1);
 }
 
-function drawSierpinskiCarpet(x, y, size, depth) {
-    if (depth === 0) {
-      ctx.fillRect(x, y, size, size);
-      return;
-    }
-  
-    const newSize = size / 3;
-  
-    for (let dx = 0; dx < 3; dx++) {
-      for (let dy = 0; dy < 3; dy++) {
-        if (dx === 1 && dy === 1) continue; // центральный квадрат — пустой
-        drawSierpinskiCarpet(x + dx * newSize, y + dy * newSize, newSize, depth - 1);
+// === Множество Мандельброта ===
+function drawMandelbrot() {
+  const imageData = ctx.createImageData(canvas.width, canvas.height);
+  const maxIter = 100;
+
+  for (let x = 0; x < canvas.width; x++) {
+    for (let y = 0; y < canvas.height; y++) {
+      let a = (x - canvas.width / 2) * 4 / canvas.width;
+      let b = (y - canvas.height / 2) * 4 / canvas.height;
+
+      let ca = a, cb = b;
+      let n = 0;
+
+      while (n < maxIter) {
+        const aa = a * a - b * b;
+        const bb = 2 * a * b;
+        a = aa + ca;
+        b = bb + cb;
+        if (a * a + b * b > 16) break;
+        n++;
       }
+
+
+      const color = n === maxIter ? 0 : 255 - Math.floor(n * 255 / maxIter);
+      const idx = (x + y * canvas.width) * 4;
+      imageData.data[idx + 0] = color;
+      imageData.data[idx + 1] = color;
+      imageData.data[idx + 2] = color;
+      imageData.data[idx + 3] = 255;
     }
   }
-  
-  function drawSierpinskiTriangle(x1, y1, x2, y2, x3, y3, depth) {
-    if (depth === 0) {
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.lineTo(x3, y3);
-      ctx.closePath();
-      ctx.fill();
-      return;
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// === Дракон Хартера-Хейтуэя ===
+function drawDragon(depth) {
+  let points = [{ x: 300, y: 300 }, { x: 500, y: 300 }];
+
+  for (let i = 0; i < depth; i++) {
+    const newPoints = [points[0]];
+    for (let j = 0; j < points.length - 1; j++) {
+      const p1 = points[j];
+      const p2 = points[j + 1];
+
+      const mx = (p1.x + p2.x) / 2;
+      const my = (p1.y + p2.y) / 2;
+
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+
+      const newX = mx - dy / 2;
+      const newY = my + dx / 2;
+
+      newPoints.push({ x: newX, y: newY }, p2);
     }
-  
-    const mx12 = (x1 + x2) / 2;
-    const my12 = (y1 + y2) / 2;
-  
-    const mx23 = (x2 + x3) / 2;
-    const my23 = (y2 + y3) / 2;
-  
-    const mx31 = (x3 + x1) / 2;
-    const my31 = (y3 + y1) / 2;
-  
-    drawSierpinskiTriangle(x1, y1, mx12, my12, mx31, my31, depth - 1);
-    drawSierpinskiTriangle(x2, y2, mx23, my23, mx12, my12, depth - 1);
-    drawSierpinskiTriangle(x3, y3, mx31, my31, mx23, my23, depth - 1);
+    points = newPoints;
   }
-  
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (const p of points) {
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+}
+
+// === Папоротник Барнсли ===
+function drawBarnsleyFern() {
+  let x = 0, y = 0;
+
+  ctx.fillStyle = "white";
+
+  for (let i = 0; i < 100000; i++) {
+    const r = Math.random();
+    let nextX, nextY;
+
+    if (r < 0.01) {
+      nextX = 0;
+      nextY = 0.16 * y;
+    } else if (r < 0.86) {
+      nextX = 0.85 * x + 0.04 * y;
+      nextY = -0.04 * x + 0.85 * y + 1.6;
+    } else if (r < 0.93) {
+      nextX = 0.2 * x - 0.26 * y;
+      nextY = 0.23 * x + 0.22 * y + 1.6;
+    } else {
+      nextX = -0.15 * x + 0.28 * y;
+      nextY = 0.26 * x + 0.24 * y + 0.44;
+    }
+
+    x = nextX;
+    y = nextY;
+
+    const px = canvas.width / 2 + x * 60;
+    const py = canvas.height - y * 60;
+    ctx.fillRect(px, py, 1, 1);
+  }
+}
 
 function updateFractal(newDepth) {
   currentDepth = newDepth;

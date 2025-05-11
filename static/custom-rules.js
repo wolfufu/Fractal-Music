@@ -74,15 +74,22 @@ class FractalRulesEditor {
         scaleFactor: 1/3,
         color: '#ffffff'
       },
-      sierpinski: {
-        color: '#ffffff',
-        levels: 3
-      },
-      carpet: {
-        color: '#ffffff',
-        levels: 3,
-        skipCenter: true
-      }
+      mandelbrot: {
+      maxIterations: 100,
+      zoom: 1,
+      offsetX: 0,
+      offsetY: 0,
+      color: '#ffffff'
+    },
+    dragon: {
+      color: '#ffffff',
+      angle: 45,
+      scaleFactor: 0.7
+    },
+    barnsley: {
+      color: '#00ff00',
+      points: 10000
+    }
     };
     
     return defaults[this.currentType];
@@ -115,21 +122,30 @@ class FractalRulesEditor {
           <li><code>color</code>: Цвет (hex, по умолчанию #ffffff)</li>
         </ul>
       `,
-      sierpinski: `
-        <h3 class="font-medium text-lg mb-2">Параметры треугольника Серпинского</h3>
+      mandelbrot: `
+        <h3 class="font-medium text-lg mb-2">Параметры множества Мандельброта</h3>
         <ul class="list-disc pl-5 space-y-1">
-          <li><code>color</code>: Цвет (hex, по умолчанию #ffffff)</li>
-          <li><code>levels</code>: Количество уровней (по умолчанию 3)</li>
+          <li><code>maxIterations</code>: Максимальное число итераций (по умолчанию 100)</li>
+          <li><code>zoom</code>: Масштаб (по умолчанию 1)</li>
+          <li><code>offsetX</code>, <code>offsetY</code>: Смещение (по умолчанию 0)</li>
+          <li><code>color</code>: Цвет (hex)</li>
         </ul>
       `,
-      carpet: `
-        <h3 class="font-medium text-lg mb-2">Параметры ковра Серпинского</h3>
+      dragon: `
+        <h3 class="font-medium text-lg mb-2">Параметры дракона Хартера-Хейтуэя</h3>
         <ul class="list-disc pl-5 space-y-1">
-          <li><code>color</code>: Цвет (hex, по умолчанию #ffffff)</li>
-          <li><code>levels</code>: Количество уровней (по умолчанию 3)</li>
-          <li><code>skipCenter</code>: Пропускать центр? (true/false, по умолчанию true)</li>
+          <li><code>angle</code>: Угол искажения (по умолчанию 45)</li>
+          <li><code>scaleFactor</code>: Коэффициент масштабирования поворота (по умолчанию 0.7)</li>
+          <li><code>color</code>: Цвет (hex)</li>
         </ul>
-      `
+      `,
+      barnsley: `
+        <h3 class="font-medium text-lg mb-2">Параметры папоротника Барнсли</h3>
+        <ul class="list-disc pl-5 space-y-1">
+          <li><code>points</code>: Количество точек (по умолчанию 10000)</li>
+          <li><code>color</code>: Цвет (hex)</li>
+        </ul>
+      `,
     };
     
     this.elements.rulesDocs.innerHTML = docs[this.currentType] || 
@@ -147,96 +163,20 @@ drawPreview() {
       case 'koch':
         this.drawKoch();
         break;
-      case 'sierpinski':
-        this.drawSierpinskiTriangle();
+      case 'mandelbrot':
+        this.drawMandelbrot();
         break;
-      case 'carpet':
-        this.drawSierpinskiCarpet();
+      case 'dragon':
+        this.drawDragon();
+        break;
+      case 'barnsley':
+        this.drawBarnsleyFern();
         break;
       default:
         console.warn(`Unknown fractal type: ${this.currentType}`);
     }
     
     this.ctx.restore();
-  }
-
-  // Метод для треугольника Серпинского
-  drawSierpinskiTriangle() {
-    this.ctx.fillStyle = this.rules.color || '#ffffff';
-    
-    const size = Math.min(this.canvas.width, this.canvas.height) * 0.8;
-    const x1 = this.canvas.width / 2;
-    const y1 = (this.canvas.height - size) / 2;
-    const x2 = x1 - size / 2;
-    const y2 = y1 + size;
-    const x3 = x1 + size / 2;
-    const y3 = y2;
-    
-    this.drawSierpinski(
-      x1, y1, x2, y2, x3, y3,
-      this.currentDepth
-    );
-  }
-
-  drawSierpinski(x1, y1, x2, y2, x3, y3, depth) {
-    if (depth <= 0) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(x1, y1);
-      this.ctx.lineTo(x2, y2);
-      this.ctx.lineTo(x3, y3);
-      this.ctx.closePath();
-      this.ctx.fill();
-      return;
-    }
-
-    const mx12 = (x1 + x2) / 2;
-    const my12 = (y1 + y2) / 2;
-    const mx23 = (x2 + x3) / 2;
-    const my23 = (y2 + y3) / 2;
-    const mx31 = (x3 + x1) / 2;
-    const my31 = (y3 + y1) / 2;
-
-    this.drawSierpinski(x1, y1, mx12, my12, mx31, my31, depth - 1);
-    this.drawSierpinski(x2, y2, mx23, my23, mx12, my12, depth - 1);
-    this.drawSierpinski(x3, y3, mx31, my31, mx23, my23, depth - 1);
-  }
-
-  // Метод для ковра Серпинского
-  drawSierpinskiCarpet() {
-    this.ctx.fillStyle = this.rules.color || '#ffffff';
-    
-    const size = Math.min(this.canvas.width, this.canvas.height) * 0.8;
-    const x = (this.canvas.width - size) / 2;
-    const y = (this.canvas.height - size) / 2;
-    
-    this.drawCarpet(
-      x, y, size,
-      this.currentDepth,
-      this.rules.skipCenter !== false
-    );
-  }
-
-  drawCarpet(x, y, size, depth, skipCenter) {
-    if (depth <= 0) {
-      this.ctx.fillRect(x, y, size, size);
-      return;
-    }
-
-    const newSize = size / 3;
-    
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        if (skipCenter && i === 1 && j === 1) continue;
-        
-        this.drawCarpet(
-          x + i * newSize,
-          y + j * newSize,
-          newSize,
-          depth - 1,
-          skipCenter
-        );
-      }
-    }
   }
   
   drawTree() {
@@ -331,6 +271,100 @@ drawPreview() {
             );
         }
     }
+
+    // метод для мандельброта
+    drawMandelbrot() {
+      const { maxIterations, zoom, offsetX, offsetY, color } = this.rules;
+      const width = this.canvas.width;
+      const height = this.canvas.height;
+      const imageData = this.ctx.createImageData(width, height);
+      const data = imageData.data;
+
+      for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+          let zx = 0, zy = 0;
+          const cx = (x - width / 2) / (200 * zoom) + offsetX;
+          const cy = (y - height / 2) / (200 * zoom) + offsetY;
+          let i = 0;
+          while (zx * zx + zy * zy < 4 && i < maxIterations) {
+            const tmp = zx * zx - zy * zy + cx;
+            zy = 2 * zx * zy + cy;
+            zx = tmp;
+            i++;
+          }
+          const p = (y * width + x) * 4;
+          const brightness = i === maxIterations ? 0 : (i / maxIterations) * 255;
+          data[p] = parseInt(color.slice(1, 3), 16) * brightness / 255;
+          data[p + 1] = parseInt(color.slice(3, 5), 16) * brightness / 255;
+          data[p + 2] = parseInt(color.slice(5, 7), 16) * brightness / 255;
+          data[p + 3] = 255;
+        }
+      }
+      this.ctx.putImageData(imageData, 0, 0);
+    }
+
+    //метод для дракона
+    drawDragon() {
+      const { angle, scaleFactor, color } = this.rules;
+      this.ctx.strokeStyle = color;
+      this.ctx.lineWidth = 1;
+
+      const points = [{ x: 200, y: 200 }, { x: 300, y: 200 }];
+
+      for (let i = 0; i < this.currentDepth; i++) {
+        const newPoints = [points[0]];
+        for (let j = 0; j < points.length - 1; j++) {
+          const a = points[j];
+          const b = points[j + 1];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const mx = (a.x + b.x) / 2;
+          const my = (a.y + b.y) / 2;
+          const nx = mx - dy * scaleFactor;
+          const ny = my + dx * scaleFactor;
+          newPoints.push({ x: nx, y: ny }, b);
+        }
+        points.splice(0, points.length, ...newPoints);
+      }
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        this.ctx.lineTo(points[i].x, points[i].y);
+      }
+      this.ctx.stroke();
+    }
+
+    //метод для папоротника
+    drawBarnsleyFern() {
+      const { color, points } = this.rules;
+      this.ctx.fillStyle = color;
+      let x = 0, y = 0;
+
+      for (let i = 0; i < points; i++) {
+        const r = Math.random();
+        let nextX, nextY;
+        if (r < 0.01) {
+          nextX = 0;
+          nextY = 0.16 * y;
+        } else if (r < 0.86) {
+          nextX = 0.85 * x + 0.04 * y;
+          nextY = -0.04 * x + 0.85 * y + 1.6;
+        } else if (r < 0.93) {
+          nextX = 0.2 * x - 0.26 * y;
+          nextY = 0.23 * x + 0.22 * y + 1.6;
+        } else {
+          nextX = -0.15 * x + 0.28 * y;
+          nextY = 0.26 * x + 0.24 * y + 0.44;
+        }
+        x = nextX;
+        y = nextY;
+        const plotX = this.canvas.width / 2 + x * 60;
+        const plotY = this.canvas.height - y * 60;
+        this.ctx.fillRect(plotX, plotY, 1, 1);
+      }
+    }
+
   
   playFractalMusic() {
     const notes = this.generateFractalMelody();
@@ -341,12 +375,13 @@ drawPreview() {
       synth.triggerAttackRelease(note, "8n", now + i * 0.3);
     });
   }
+
   
   generateFractalMelody() {
     const scales = {
-      major: ["C4", "E4", "G4", "B4"],
-      minor: ["D4", "F4", "A4", "C5"],
-      pentatonic: ["G3", "A3", "C4", "D4", "F4"]
+      major: ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"],
+      minor: ["A3", "B3", "C4", "D4", "E4", "F4", "G4", "A4"],
+      pentatonic: ["C4", "D4", "E4", "G4", "A4"]
     };
     
     const notes = [];
@@ -360,38 +395,58 @@ drawPreview() {
   }
   
   // генерация музыки для всех фракталов
+  // генерация музыки для всех фракталов
   generateMusicPattern() {
     const pattern = [];
     const complexity = this.currentDepth * 2;
-    
+
     switch(this.currentType) {
       case 'tree':
         const branches = this.rules.branches || 2;
         for (let i = 0; i < complexity * branches; i++) {
-          pattern.push(i % 7);
+          pattern.push(i % 7); // Плавное повторение нот в зависимости от количества ветвей
         }
         break;
-        
+
       case 'koch':
         const segments = this.rules.segments || 4;
         for (let i = 0; i < Math.pow(segments, this.currentDepth); i++) {
           pattern.push(Math.floor(Math.sin(i) * 5) % 7);
         }
         break;
-        
-      case 'sierpinski':
-        for (let i = 0; i < Math.pow(3, this.currentDepth); i++) {
-          pattern.push((i & (i + 1)) === 0 ? 0 : i % 7);
+
+      case 'mandelbrot':
+        // Мандельброт: количество итераций
+        const maxIterations = this.rules.maxIterations || 100;
+        for (let i = 0; i < maxIterations; i++) {
+          const normalized = Math.floor(i / maxIterations * 7); // Нормализуем число итераций для создания мелодии
+          pattern.push(normalized);
         }
         break;
-        
-      case 'carpet':
-        for (let i = 0; i < complexity * 4; i++) {
-          pattern.push(i % 7);
+
+      case 'dragon':
+        // Дракон: использование углов поворота и количества точек для создания вариаций
+        const dragonPoints = Math.pow(2, this.currentDepth); // Количество точек в зависимости от глубины
+        for (let i = 0; i < dragonPoints; i++) {
+          const angle = Math.sin(i * Math.PI / dragonPoints) * 7; // Синусоиды для изменения высоты
+          pattern.push(Math.floor((angle + 7) % 7)); // Нормализуем результат в диапазоне от 0 до 6
         }
+        break;
+
+      case 'barnsley':
+        // Папоротник Барнсли: использование случайных значений для точек
+        const points = this.rules.points || 10000;
+        for (let i = 0; i < points; i++) {
+          const randomNote = Math.floor(Math.random() * 7); // Генерируем случайные ноты для случайных точек
+          pattern.push(randomNote);
+        }
+        break;
+
+      default:
+        console.warn('Неизвестный тип фрактала, музыка не будет сгенерирована.');
         break;
     }
-    
+
     return pattern;
   }
 }
