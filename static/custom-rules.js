@@ -320,8 +320,8 @@ drawPreview() {
           const dy = b.y - a.y;
           const mx = (a.x + b.x) / 2;
           const my = (a.y + b.y) / 2;
-          const nx = mx - dy * scaleFactor;
-          const ny = my + dx * scaleFactor;
+          const nx = mx - dy * (angle / 180 * Math.PI) * scaleFactor; // Используем угол в вычислениях
+          const ny = my + dx * (angle / 180 * Math.PI) * scaleFactor; // Используем угол в вычислениях
           newPoints.push({ x: nx, y: ny }, b);
         }
         points.splice(0, points.length, ...newPoints);

@@ -99,7 +99,7 @@ function drawKochLine(x1, y1, x5, y5, depth) {
 // === Множество Мандельброта ===
 function drawMandelbrot() {
   const imageData = ctx.createImageData(canvas.width, canvas.height);
-  const maxIter = 100;
+  const maxIter = 100 + currentDepth * 20;  // Зависимость количества итераций от глубины
 
   for (let x = 0; x < canvas.width; x++) {
     for (let y = 0; y < canvas.height; y++) {
@@ -114,11 +114,11 @@ function drawMandelbrot() {
         const bb = 2 * a * b;
         a = aa + ca;
         b = bb + cb;
-        if (a * a + b * b > 16) break;
+        if (a * a + b * b > 16) break;  // Выход из цикла, если точка вышла за пределы
         n++;
       }
 
-
+      // Цвет пикселя зависит от количества итераций
       const color = n === maxIter ? 0 : 255 - Math.floor(n * 255 / maxIter);
       const idx = (x + y * canvas.width) * 4;
       imageData.data[idx + 0] = color;
