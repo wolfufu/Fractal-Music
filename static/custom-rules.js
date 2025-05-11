@@ -393,8 +393,60 @@ drawPreview() {
     
     return notes;
   }
+
+  playFractalMusic() {
+  this.playFractalArrangement();
+}
+
+playFractalArrangement() {
+  const leadFractal = document.getElementById('fractal-lead').value;
+  const drumsFractal = document.getElementById('fractal-drums').value;
+  const bassFractal = document.getElementById('fractal-bass').value;
+
+  const now = Tone.now();
+
+  // Lead synth
+  const leadSynth = new Tone.Synth().toDestination();
+  const leadNotes = this.generateMelodyFromFractal(leadFractal);
+  leadNotes.forEach((note, i) => {
+    leadSynth.triggerAttackRelease(note, "8n", now + i * 0.4);
+  });
+
+  // Bass synth
+  const bassSynth = new Tone.MonoSynth().toDestination();
+  const bassNotes = this.generateBassFromFractal(bassFractal);
+  bassNotes.forEach((note, i) => {
+    bassSynth.triggerAttackRelease(note, "8n", now + i * 0.8);
+  });
+
+  // Drums
+  const drum = new Tone.MembraneSynth().toDestination();
+  const drumPattern = this.generateDrumPatternFromFractal(drumsFractal);
+  drumPattern.forEach((hit, i) => {
+    if (hit) drum.triggerAttackRelease("C2", "8n", now + i * 0.4);
+  });
+}
+
+generateMelodyFromFractal(type) {
+  const scale = ["C4", "D4", "E4", "G4", "A4", "C5"];
+  const length = 8;
+  return Array.from({ length }, () => scale[Math.floor(Math.random() * scale.length)]);
+}
+
+generateBassFromFractal(type) {
+  const notes = ["C2", "D2", "E2", "G2", "A2"];
+  return Array.from({ length: 4 }, () => notes[Math.floor(Math.random() * notes.length)]);
+}
+
+generateDrumPatternFromFractal(type) {
+  const pattern = [];
+  for (let i = 0; i < 16; i++) {
+    pattern.push(Math.random() < 0.4); // 40% шанс удара
+  }
+  return pattern;
+}
+
   
-  // генерация музыки для всех фракталов
   // генерация музыки для всех фракталов
   generateMusicPattern() {
     const pattern = [];
