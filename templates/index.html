@@ -2,73 +2,125 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Расширенные правила фракталов</title>
+  <title>Фрактальная музыкальная система</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.min.js"></script>
 </head>
 <body class="bg-gray-900 text-white font-sans min-h-screen p-8">
-  <div class="max-w-4xl mx-auto">
+  <div class="max-w-6xl mx-auto">
 
-    <h1 class="text-3xl font-bold mb-6">🎨 Расширенные правила фракталов</h1>
+    <h1 class="text-3xl font-bold mb-6">🎵 Фрактальная музыкальная система</h1>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <!-- Блок редактора правил -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Основная мелодия -->
       <div class="bg-gray-800 p-6 rounded-lg">
-        <h2 class="text-xl font-semibold mb-4">Редактор правил</h2>
-        
+        <h2 class="text-xl font-semibold mb-4">Основная мелодия</h2>
+        <select id="melody-type" class="bg-gray-700 text-white px-3 py-2 rounded w-full mb-4">
+          <option value="tree">Дерево</option>
+          <option value="koch">Кривая Коха</option>
+          <option value="mandelbrot">Мандельброт</option>
+        </select>
+        <canvas id="melody-canvas" width="300" height="300" class="w-full bg-gray-900 rounded mb-4"></canvas>
         <div class="mb-4">
-          <label class="block mb-2">Тип фрактала:</label>
-          <select id="fractal-type" class="bg-gray-700 text-white px-3 py-2 rounded w-full">
-            <option value="tree">Дерево</option>
-            <option value="koch">Кривая Коха</option>
-            <option value="mandelbrot">Мандельброт</option>
-            <option value="dragon">Дракон Хартера-Хейтуэя</option>
-            <option value="barnsley">Папоротник Барнсли</option>
-          </select>
+          <label class="block mb-1">Глубина:</label>
+          <input type="range" id="melody-depth" min="1" max="8" value="3" class="w-full">
+          <div class="text-center text-sm" id="melody-depth-value">3</div>
         </div>
-        
-        <div class="mb-4">
-          <label class="block mb-2">Правила (JSON):</label>
-          <textarea id="rules-editor" class="w-full h-64 bg-gray-700 text-white p-3 rounded font-mono text-sm"></textarea>
-        </div>
-        
-        <div class="flex space-x-3">
-          <button id="apply-btn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded flex-1">
-            Применить правила
-          </button>
-          <button id="reset-btn" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded">
-            Сбросить
-          </button>
-        </div>
+        <textarea id="melody-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2"></textarea>
+        <button id="melody-apply" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded w-full mb-2">
+          Применить
+        </button>
+        <button id="melody-reset" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded w-full">
+          Сбросить
+        </button>
       </div>
       
-      <!-- Блок предпросмотра -->
+      <!-- Басовая линия -->
       <div class="bg-gray-800 p-6 rounded-lg">
-        <h2 class="text-xl font-semibold mb-4">Предпросмотр</h2>
-        <canvas id="preview-canvas" width="400" height="400" class="w-full bg-gray-900 rounded mb-4"></canvas>
-        
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block mb-1">Глубина:</label>
-            <input type="range" id="depth-range" min="1" max="8" value="3" class="w-full">
-            <div class="text-center text-sm" id="depth-value">3</div>
-          </div>
-          
-          <div>
-            <button id="play-btn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded w-full mt-6">
-              Проиграть мелодию
-            </button>
-          </div>
+        <h2 class="text-xl font-semibold mb-4">Басовая линия</h2>
+        <select id="bass-type" class="bg-gray-700 text-white px-3 py-2 rounded w-full mb-4">
+          <option value="dragon">Дракон</option>
+          <option value="tree">Дерево</option>
+          <option value="koch">Кривая Коха</option>
+        </select>
+        <canvas id="bass-canvas" width="300" height="300" class="w-full bg-gray-900 rounded mb-4"></canvas>
+        <div class="mb-4">
+          <label class="block mb-1">Глубина:</label>
+          <input type="range" id="bass-depth" min="1" max="8" value="3" class="w-full">
+          <div class="text-center text-sm" id="bass-depth-value">3</div>
         </div>
+        <textarea id="bass-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2"></textarea>
+        <button id="bass-apply" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded w-full mb-2">
+          Применить
+        </button>
+        <button id="bass-reset" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded w-full">
+          Сбросить
+        </button>
+      </div>
+      
+      <!-- Ударные -->
+      <div class="bg-gray-800 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold mb-4">Ударные</h2>
+        <select id="drums-type" class="bg-gray-700 text-white px-3 py-2 rounded w-full mb-4">
+          <option value="barnsley">Папоротник</option>
+          <option value="mandelbrot">Мандельброт</option>
+          <option value="dragon">Дракон</option>
+        </select>
+        <canvas id="drums-canvas" width="300" height="300" class="w-full bg-gray-900 rounded mb-4"></canvas>
+        <div class="mb-4">
+          <label class="block mb-1">Глубина:</label>
+          <input type="range" id="drums-depth" min="1" max="8" value="3" class="w-full">
+          <div class="text-center text-sm" id="drums-depth-value">3</div>
+        </div>
+        <textarea id="drums-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2"></textarea>
+        <button id="drums-apply" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded w-full mb-2">
+          Применить
+        </button>
+        <button id="drums-reset" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded w-full">
+          Сбросить
+        </button>
       </div>
     </div>
     
-    <div class="mt-8 bg-gray-800 p-6 rounded-lg" id="documentation">
-      <h2 class="text-xl font-semibold mb-4">Документация</h2>
-      <div id="rules-docs"></div>
+    <div class="mt-6 bg-gray-800 p-6 rounded-lg">
+      <h2 class="text-xl font-semibold mb-4">Управление воспроизведением</h2>
+      <div class="flex space-x-4">
+        <button id="play-all" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg text-lg flex-1">
+          ▶️ Проиграть все
+        </button>
+        <button id="stop-all" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg text-lg flex-1">
+          ⏹ Остановить
+        </button>
+      </div>
+      <div class="mt-4 grid grid-cols-3 gap-4">
+        <button id="play-melody" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded">
+          Проиграть мелодию
+        </button>
+        <button id="play-bass" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded">
+          Проиграть бас
+        </button>
+        <button id="play-drums" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">
+          Проиграть ударные
+        </button>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-4">
+        <button id="save-preset" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded">
+          Сохранить пресет
+        </button>
+        <button id="export-music" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
+          Экспорт музыки
+        </button>
+      </div>
+    </div>
+
+    <!-- История пресетов -->
+    <div class="mt-6 bg-gray-800 p-6 rounded-lg">
+      <h2 class="text-xl font-semibold mb-4">История пресетов</h2>
+      <div id="presets-history" class="space-y-2 max-h-64 overflow-y-auto">
+        <!-- Пресеты будут добавляться сюда -->
+      </div>
     </div>
   </div>
-
-  <script src="/static/custom-rules.js"></script>
+  <script src="/static/script.js"></script>
 </body>
 </html>
