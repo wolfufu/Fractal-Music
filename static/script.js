@@ -484,25 +484,63 @@ class FractalMusicSystem {
   drawKoch(ctx, canvas, rules, depth) {
     ctx.strokeStyle = rules.color || '#48dbfb';
     ctx.lineWidth = 1;
-    
-    const segments = rules.segments || 4;
-    const angle = (rules.angle || 60) * Math.PI / 180;
-    const scaleFactor = rules.scaleFactor || 1/3;
-    
-    const startX = 50;
-    const startY = canvas.height / 2;
-    const endX = canvas.width - 50;
-    const endY = canvas.height / 2;
-    
-    this.drawKochLine(
-      ctx,
-      startX, startY,
-      endX, endY,
-      depth,
-      segments,
-      angle,
-      scaleFactor
-    );
+
+    const sideLength = Math.min(canvas.width, canvas.height) * 0.6;
+    const height = sideLength * Math.sqrt(3) / 2;
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const angleDeg = rules.angle || 60;
+    const angleRad = angleDeg * Math.PI / 180;
+    const scaleFactor = rules.scaleFactor || 1 / 3;
+
+    const p1 = {
+      x: centerX,
+      y: centerY - (2 / 3) * height
+    };
+    const p2 = {
+      x: centerX - sideLength / 2,
+      y: centerY + (1 / 3) * height
+    };
+    const p3 = {
+      x: centerX + sideLength / 2,
+      y: centerY + (1 / 3) * height
+    };
+
+    this.drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor);
+    this.drawKochSide(ctx, p2, p3, depth, angleRad, scaleFactor);
+    this.drawKochSide(ctx, p3, p1, depth, angleRad, scaleFactor);
+  }
+
+  drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor) {
+    if (depth === 0) {
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      return;
+    }
+
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+
+    const x1 = p1.x + dx * scaleFactor;
+    const y1 = p1.y + dy * scaleFactor;
+
+    const x2 = p1.x + dx * (1 - scaleFactor);
+    const y2 = p1.y + dy * (1 - scaleFactor);
+
+    const angle = Math.atan2(dy, dx);
+    const length = Math.sqrt((dx * dx + dy * dy)) * scaleFactor;
+
+    const xPeak = x1 + length * Math.cos(angle - angleRad);
+    const yPeak = y1 + length * Math.sin(angle - angleRad);
+
+    this.drawKochSide(ctx, p1, { x: x1, y: y1 }, depth - 1, angleRad, scaleFactor);
+    this.drawKochSide(ctx, { x: x1, y: y1 }, { x: xPeak, y: yPeak }, depth - 1, angleRad, scaleFactor);
+    this.drawKochSide(ctx, { x: xPeak, y: yPeak }, { x: x2, y: y2 }, depth - 1, angleRad, scaleFactor);
+    this.drawKochSide(ctx, { x: x2, y: y2 }, p2, depth - 1, angleRad, scaleFactor);
   }
   
   drawKochLine(ctx, x1, y1, x2, y2, depth, segments, angle, scaleFactor) {
@@ -574,35 +612,51 @@ class FractalMusicSystem {
   }
   
   drawDragon(ctx, canvas, rules, depth) {
-    const { angle, scaleFactor, color } = rules;
+    const { color } = rules;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
 
-    const points = [{ x: 50, y: 150 }, { x: 250, y: 150 }];
-
+    // L-система
+    let axiom = "FX";
     for (let i = 0; i < depth; i++) {
-      const newPoints = [points[0]];
-      for (let j = 0; j < points.length - 1; j++) {
-        const a = points[j];
-        const b = points[j + 1];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const mx = (a.x + b.x) / 2;
-        const my = (a.y + b.y) / 2;
-        const nx = mx - dy * (angle / 180 * Math.PI) * scaleFactor;
-        const ny = my + dx * (angle / 180 * Math.PI) * scaleFactor;
-        newPoints.push({ x: nx, y: ny }, b);
+      let next = "";
+      for (let char of axiom) {
+        if (char === "X") {
+          next += "X+YF+";
+        } else if (char === "Y") {
+          next += "-FX-Y";
+        } else {
+          next += char;
+        }
       }
-      points.splice(0, points.length, ...newPoints);
+      axiom = next;
     }
+
+    // Рисование по L-системе
+    const step = 10;
+    let x = canvas.width / 2;
+    let y = canvas.height / 2;
+    let angle = 0;
 
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i].x, points[i].y);
+    ctx.moveTo(x, y);
+
+    for (let char of axiom) {
+      if (char === "F") {
+        const rad = angle * Math.PI / 180;
+        x += step * Math.cos(rad);
+        y += step * Math.sin(rad);
+        ctx.lineTo(x, y);
+      } else if (char === "+") {
+        angle += 90;
+      } else if (char === "-") {
+        angle -= 90;
+      }
     }
+
     ctx.stroke();
   }
+
   
   drawBarnsleyFern(ctx, canvas, rules) {
     const { color, points } = rules;
@@ -735,9 +789,12 @@ class FractalMusicSystem {
         break;
 
       case 'koch':
-        const segments = rules.segments || 4;
-        for (let i = 0; i < Math.pow(segments, depth); i++) {
-          pattern.push(Math.floor(Math.sin(i) * 5) % 7);
+        const noteCount = 3 * Math.pow(4, depth); // количество отрезков в снежинке
+        for (let i = 0; i < noteCount; i++) {
+          // например, цикл по гамме вверх и вниз
+          const value = i % 14;
+          const noteIndex = value < 7 ? value : 13 - value; // пилообразно
+          pattern.push(noteIndex);
         }
         break;
 
