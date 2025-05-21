@@ -543,44 +543,6 @@ class FractalMusicSystem {
     this.drawKochSide(ctx, { x: x2, y: y2 }, p2, depth - 1, angleRad, scaleFactor);
   }
   
-  drawKochLine(ctx, x1, y1, x2, y2, depth, segments, angle, scaleFactor) {
-    if (depth === 0) {
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-      return;
-    }
-
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const length = Math.sqrt(dx * dx + dy * dy) * scaleFactor;
-    const initialAngle = Math.atan2(dy, dx);
-
-    let points = [{x: x1, y: y1}];
-    let currentX = x1;
-    let currentY = y1;
-
-    for (let i = 1; i <= segments; i++) {
-      const segmentAngle = initialAngle + angle * (i - (segments - 1)/2);
-      currentX += length * Math.cos(segmentAngle);
-      currentY += length * Math.sin(segmentAngle);
-      points.push({x: currentX, y: currentY});
-    }
-
-    for (let i = 0; i < points.length - 1; i++) {
-      this.drawKochLine(
-        ctx,
-        points[i].x, points[i].y,
-        points[i+1].x, points[i+1].y,
-        depth - 1,
-        segments,
-        angle,
-        scaleFactor
-      );
-    }
-  }
-  
   drawMandelbrot(ctx, canvas, rules) {
     const { maxIterations, zoom, offsetX, offsetY, color } = rules;
     const width = canvas.width;
