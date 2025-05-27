@@ -104,6 +104,9 @@
         </button>
       </div>
       <div class="mt-4 grid grid-cols-2 gap-4">
+        <button id="save-preset" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded">
+          Сохранить пресет
+        </button>
         <button id="export-music" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
           Экспорт музыки
         </button>
@@ -112,7 +115,7 @@
 
     <div class="mt-4 flex justify-between">
       <button id="save-to-db" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded">
-        Сохранить в базу
+        Сохранить
       </button>
       <button id="add-to-favorites" class="bg-pink-500 hover:bg-pink-600 px-4 py-2 rounded">
         В избранное
@@ -136,14 +139,6 @@
       <div id="favorites-list" class="space-y-2 hidden">
         <p class="text-sm text-gray-400">Загрузка избранных...</p>
       </div>
-    </div>
-
-
-    <div class="mt-6 bg-gray-800 p-6 rounded-lg">
-      <h2 class="text-xl font-semibold mb-4">История действий</h2>
-      <ul id="user-history" class="space-y-2 text-sm text-gray-300">
-        <!-- История будет загружена сюда -->
-      </ul>
     </div>
   </div>
   <script src="/static/script.js"></script>

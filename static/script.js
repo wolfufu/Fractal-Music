@@ -1,66 +1,4 @@
-async function checkAuth() {
-  const res = await fetch("/check_auth");
-  const data = await res.json();
-  if (!data.authenticated) {
-    window.location.href = "/login";
-  }
-}
-
-async function saveToDatabase() {
-  const payload = {
-    title: prompt("Введите название композиции") || "Без названия",
-    melody: fractalSystem.melody,
-    bass: fractalSystem.bass,
-    drums: fractalSystem.drums
-  };
-  const res = await fetch("/save_composition", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const data = await res.json();
-  if (data.composition_id) {
-    alert("Сохранено в базу!");
-    loadHistory();
-    compositionId = data.composition_id;
-  }
-}
-
-async function addToFavorites() {
-  if (!compositionId) {
-    alert("Сначала сохраните композицию.");
-    return;
-  }
-  const res = await fetch("/add_favorite", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ composition_id: compositionId })
-  });
-  const data = await res.json();
-  if (data.success) alert("Добавлено в избранное!");
-}
-
-async function loadHistory() {
-  const res = await fetch("/history");
-  const history = await res.json();
-  const container = document.getElementById("user-history");
-  container.innerHTML = "";
-  history.forEach(item => {
-    const li = document.createElement("li");
-    li.textContent = `[${item.time}] ${item.type}: ${item.data.title || JSON.stringify(item.data)}`;
-    container.appendChild(li);
-  });
-}
-
 let compositionId = null;
-
-document.addEventListener("DOMContentLoaded", () => {
-  checkAuth();
-  loadHistory();
-  document.getElementById("save-to-db").addEventListener("click", saveToDatabase);
-  document.getElementById("add-to-favorites").addEventListener("click", addToFavorites);
-});
-
 
 class FractalMusicSystem {
   constructor() {
@@ -293,14 +231,21 @@ class FractalMusicSystem {
         rules: this.drums.rules
       }
     };
-    
-    this.presetsHistory.unshift(preset);
-    this.savePresetsToLocalStorage();
-    this.renderPresetsHistory();
-    
-    // Создаем временную кнопку для скачивания JSON
-    this.downloadObjectAsJson(preset, `fractal_music_preset_${preset.id}`);
+
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(preset, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute("href", dataStr);
+      a.setAttribute("download", `fractal_music_preset_${preset.id}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      console.log("Пресет успешно сохранён:", preset);
+    } catch (e) {
+      console.error("Ошибка при сохранении пресета:", e);
+    }
   }
+
 
   // Загрузка пресета
   loadPreset(preset) {
@@ -880,10 +825,106 @@ class FractalMusicSystem {
   }
 }
 
-// Инициализация при загрузке страницы
-document.addEventListener('DOMContentLoaded', () => {
-  new FractalMusicSystem();
-});
+async function checkAuth() {
+  const res = await fetch("/check_auth");
+  const data = await res.json();
+  if (!data.authenticated) {
+    window.location.href = "/login";
+  }
+}
+
+async function saveToDatabase() {
+  await checkAuth(); // Добавляем проверку аутентификации
+  
+  if (typeof window.fractalSystem === 'undefined' || !window.fractalSystem) {
+    alert("Пожалуйста, подождите, система ещё загружается...");
+    return;
+  }
+
+  // Создаем чистые объекты без DOM-элементов
+  const getCleanData = (component) => ({
+    type: component.type,
+    depth: component.depth,
+    rules: component.rules
+  });
+
+  const payload = {
+    title: prompt("Введите название композиции") || "Без названия",
+    melody: getCleanData(window.fractalSystem.melody),
+    bass: getCleanData(window.fractalSystem.bass),
+    drums: getCleanData(window.fractalSystem.drums)
+  };
+
+  console.log("Отправка на сервер:", payload);
+
+  try {
+    const res = await fetch("/save_composition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || "Неизвестная ошибка сервера");
+    }
+
+    const data = await res.json();
+    console.log("📥 Ответ сервера:", data);
+
+    if (data.composition_id) {
+      alert("🎵 Композиция сохранена!");
+      compositionId = data.composition_id;
+      loadSavedCompositions();
+    }
+  } catch (err) {
+    console.error("Ошибка запроса:", err);
+    alert("Ошибка сохранения: " + err.message);
+  }
+}
+
+async function addToFavorites() {
+  if (!compositionId) {
+    alert("Сначала сохраните композицию в базу.");
+    return;
+  }
+
+  console.log("Добавление в избранное:", compositionId);
+
+  try {
+    const res = await fetch("/add_favorite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ composition_id: compositionId })
+    });
+
+    const data = await res.json();
+    console.log("Ответ от /add_favorite:", data);
+
+    if (res.ok && data.success) {
+      alert("Добавлено в избранное!");
+      loadFavorites();
+    } else {
+      alert("Не удалось добавить в избранное: " + (data.error || "неизвестная ошибка"));
+    }
+  } catch (err) {
+    console.error("Ошибка при добавлении в избранное:", err);
+    alert("Ошибка связи с сервером");
+  }
+}
+
+
+async function loadHistory() {
+  const res = await fetch("/history");
+  const history = await res.json();
+  const container = document.getElementById("user-history");
+  container.innerHTML = "";
+  history.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = `[${item.time}] ${item.type}: ${item.data.title || JSON.stringify(item.data)}`;
+    container.appendChild(li);
+  });
+}
 
 async function loadSavedCompositions() {
   const res = await fetch("/history");
@@ -946,12 +987,40 @@ function setupTabs() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function waitForElement(id, tries = 20) {
+  return new Promise((resolve, reject) => {
+    const interval = setInterval(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        clearInterval(interval);
+        resolve();
+      }
+      if (--tries <= 0) {
+        clearInterval(interval);
+        reject(`❌ Элемент #${id} не найден`);
+      }
+    }, 100);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
   checkAuth();
   loadHistory();
   loadSavedCompositions();
   loadFavorites();
   setupTabs();
+
   document.getElementById("save-to-db").addEventListener("click", saveToDatabase);
   document.getElementById("add-to-favorites").addEventListener("click", addToFavorites);
+
+  try {
+    await waitForElement("melody-type");
+    window.fractalSystem = new FractalMusicSystem();
+  } catch (e) {
+    console.error(e);
+  }
 });
+
+
+
+

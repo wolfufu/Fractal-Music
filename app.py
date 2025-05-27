@@ -10,6 +10,9 @@ app = Flask(__name__, static_folder="static")
 app.secret_key = "your_secret_key"
 CORS(app, supports_credentials=True)
 
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+
 conn = psycopg2.connect(
     dbname="fractune",
     user="postgres",
@@ -70,26 +73,44 @@ def save_composition():
     if "session_id" not in session:
         return jsonify({"error": "Unauthorized"}), 403
 
-    data = request.get_json()
     with conn.cursor() as cur:
-        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        # Проверяем, что сессия существует и не истекла
+        cur.execute("""
+            SELECT user_id FROM user_sessions 
+            WHERE session_id = %s AND expires_at > NOW()
+        """, (session["session_id"],))
         result = cur.fetchone()
         if not result:
-            return jsonify({"error": "Invalid session"}), 403
+            return jsonify({"error": "Invalid or expired session"}), 403
 
         user_id = result[0]
-        cur.execute("""
-            INSERT INTO compositions (user_id, title, melody_data, bass_data, drums_data)
-            VALUES (%s, %s, %s, %s, %s) RETURNING composition_id
-        """, (user_id, data["title"], json.dumps(data["melody"]), json.dumps(data["bass"]), json.dumps(data["drums"])))
-        composition_id = cur.fetchone()[0]
+        data = request.get_json()
+        
+        try:
+            # Проверяем, что данные корректны
+            if not all(key in data for key in ["title", "melody", "bass", "drums"]):
+                return jsonify({"error": "Invalid data format"}), 400
+                
+            cur.execute("""
+                INSERT INTO compositions (user_id, title, melody_data, bass_data, drums_data)
+                VALUES (%s, %s, %s, %s, %s) RETURNING composition_id
+            """, (user_id, data["title"], 
+                 json.dumps(data["melody"]), 
+                 json.dumps(data["bass"]), 
+                 json.dumps(data["drums"])))
+            composition_id = cur.fetchone()[0]
 
-        cur.execute("""
-            INSERT INTO user_history (user_id, action_type, action_data)
-            VALUES (%s, 'composition_created', %s)
-        """, (user_id, json.dumps({"composition_id": composition_id, "title": data["title"]})))
-        conn.commit()
-        return jsonify({"composition_id": composition_id})
+            cur.execute("""
+                INSERT INTO user_history (user_id, action_type, action_data)
+                VALUES (%s, 'composition_created', %s)
+            """, (user_id, json.dumps({"composition_id": composition_id, "title": data["title"]})))
+            
+            conn.commit()
+            return jsonify({"composition_id": composition_id})
+            
+        except (psycopg2.Error, KeyError, json.JSONDecodeError) as e:
+            conn.rollback()
+            return jsonify({"error": str(e)}), 400
 
 @app.route("/add_favorite", methods=["POST"])
 def add_favorite():
