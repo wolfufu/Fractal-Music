@@ -136,6 +136,85 @@ def add_favorite():
 
         conn.commit()
         return jsonify({"success": True})
+    
+@app.route("/delete_composition/<int:composition_id>", methods=["DELETE"])
+def delete_composition(composition_id):
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+    try:
+        with conn.cursor() as cur:
+            # Проверяем, что сессия действительна
+            cur.execute("""
+                SELECT user_id FROM user_sessions 
+                WHERE session_id = %s AND expires_at > NOW()
+            """, (session["session_id"],))
+            result = cur.fetchone()
+            if not result:
+                return jsonify({"error": "Invalid or expired session"}), 403
+
+            user_id = result[0]
+            
+            # Сначала проверяем существование композиции
+            cur.execute("""
+                SELECT composition_id FROM compositions 
+                WHERE composition_id = %s AND user_id = %s
+            """, (composition_id, user_id))
+            composition = cur.fetchone()
+            
+            if not composition:
+                return jsonify({"error": "Composition not found or access denied"}), 404
+            
+            # Удаляем из избранного (если есть)
+            cur.execute("""
+                DELETE FROM favorites 
+                WHERE composition_id = %s
+            """, (composition_id,))
+            
+            # Удаляем саму композицию
+            cur.execute("""
+                DELETE FROM compositions 
+                WHERE composition_id = %s
+            """, (composition_id,))
+            
+            # Добавляем в историю
+            cur.execute("""
+                INSERT INTO user_history (user_id, action_type, action_data)
+                VALUES (%s, 'composition_deleted', %s)
+            """, (user_id, json.dumps({"composition_id": composition_id})))
+            
+            conn.commit()  # Явное подтверждение изменений
+            return jsonify({"success": True})
+        
+    except Exception as e:
+        conn.rollback()  # Откат при ошибке
+        return jsonify({"error": str(e)}), 500
+
+    
+@app.route("/add_favorite", methods=["DELETE"])
+def remove_favorite():
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json()
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Invalid session"}), 403
+        user_id = result[0]
+        
+        cur.execute("""
+            DELETE FROM favorites 
+            WHERE user_id = %s AND composition_id = %s
+        """, (user_id, data["composition_id"]))
+        
+        cur.execute("""
+            INSERT INTO user_history (user_id, action_type, action_data)
+            VALUES (%s, 'favorite_removed', %s)
+        """, (user_id, json.dumps({"composition_id": data["composition_id"]})))
+        
+        conn.commit()
+        return jsonify({"success": True})
 
 @app.route("/favorites")
 def get_favorites():
@@ -195,7 +274,6 @@ def get_composition(composition_id):
                 "drums": composition[3]
             })
 
-
 @app.route("/history")
 def get_history():
     if "session_id" not in session:
@@ -206,19 +284,56 @@ def get_history():
         result = cur.fetchone()
         if not result:
             return jsonify({"error": "Invalid session"}), 403
+        
         user_id = result[0]
+        
+        # Получаем ТОЛЬКО существующие композиции
         cur.execute("""
-            SELECT action_type, action_time, action_data
-            FROM user_history
+            SELECT 
+                'composition_created' as action_type,
+                creation_date as action_time,
+                json_build_object(
+                    'composition_id', composition_id,
+                    'title', title
+                ) as action_data
+            FROM compositions
             WHERE user_id = %s
-            ORDER BY action_time DESC LIMIT 50
+            ORDER BY creation_date DESC
+            LIMIT 50
         """, (user_id,))
+        
         history = cur.fetchall()
         return jsonify([{
             "type": row[0],
             "time": row[1].isoformat(),
             "data": row[2]
         } for row in history])
+    
+@app.route("/my_compositions")
+def get_my_compositions():
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Invalid session"}), 403
+        
+        user_id = result[0]
+        
+        cur.execute("""
+            SELECT composition_id, title, creation_date 
+            FROM compositions 
+            WHERE user_id = %s
+            ORDER BY creation_date DESC
+        """, (user_id,))
+        
+        return jsonify([{
+            "composition_id": row[0],
+            "title": row[1],
+            "created": row[2].isoformat()
+        } for row in cur.fetchall()])
 
 @app.route("/check_auth")
 def check_auth():

@@ -62,6 +62,33 @@ class FractalMusicSystem {
     this.setupEventListeners();
     this.updateAllEditors();
     this.drawAllPreviews();
+
+    // Инициализация визуализаторов
+    this.oscilloscope = {
+      canvas: document.getElementById('oscilloscope'),
+      ctx: document.getElementById('oscilloscope').getContext('2d')
+    };
+    
+    this.circleVisualizer = {
+      canvas: document.getElementById('circle-visualizer'),
+      ctx: document.getElementById('circle-visualizer').getContext('2d')
+    };
+    
+    // Анализаторы для визуализации
+    this.waveformAnalyser = new Tone.Waveform(256);
+    this.analyser = new Tone.Analyser("fft", 64);
+    
+    // Подключаем синтезаторы к анализаторам
+    this.melodySynth.connect(this.waveformAnalyser);
+    this.bassSynth.connect(this.waveformAnalyser);
+    this.drumSynth.connect(this.waveformAnalyser);
+    
+    this.melodySynth.connect(this.analyser);
+    this.bassSynth.connect(this.analyser);
+    this.drumSynth.connect(this.analyser);
+    
+    // Запускаем анимацию визуализации
+    this.startVisualization();
   }
   
   initElements() {
@@ -207,6 +234,162 @@ class FractalMusicSystem {
 
     this.elements.savePreset.addEventListener('click', () => this.saveCurrentPreset());
     this.elements.exportMusic.addEventListener('click', () => this.exportMusic());
+  }
+
+  startVisualization() {
+    const draw = () => {
+      requestAnimationFrame(draw);
+      
+      // Получаем данные для визуализации
+      const waveform = this.waveformAnalyser.getValue();
+      const frequencyData = this.analyser.getValue();
+      
+      // Отрисовываем визуализации
+      this.drawOscilloscope(waveform);
+      this.drawCircleVisualizer(frequencyData);
+    };
+    
+    draw();
+  }
+
+  drawOscilloscope(waveform) {
+    const { ctx, canvas } = this.oscilloscope;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#4fd1c5';
+    ctx.beginPath();
+    
+    const sliceWidth = canvas.width / waveform.length;
+    let x = 0;
+    
+    for (let i = 0; i < waveform.length; i++) {
+      const v = waveform[i] / 2 + 0.5;
+      const y = v * canvas.height;
+      
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+      
+      x += sliceWidth;
+    }
+    
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+  }
+
+  drawCircleVisualizer(frequencyData) {
+    const { ctx, canvas } = this.circleVisualizer;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(canvas.width, canvas.height) * 0.4;
+    
+    // Рисуем базовый круг
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Анализируем частоты для разных диапазонов
+    const bass = this.getFrequencyRangeValue(frequencyData, 20, 140);
+    const mid = this.getFrequencyRangeValue(frequencyData, 140, 4000);
+    const high = this.getFrequencyRangeValue(frequencyData, 4000, 20000);
+    
+    // Рисуем реакцию на басы (внутренний круг)
+    const bassRadius = radius * 0.3 * (1 + bass / 255);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, bassRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(100, 200, 255, 0.7)';
+    ctx.fill();
+    
+    // Рисуем средние частоты (сегменты)
+    const segments = 12;
+    const midSegmentAngle = (2 * Math.PI) / segments;
+    
+    for (let i = 0; i < segments; i++) {
+      const angle = i * midSegmentAngle;
+      const segmentValue = this.getFrequencyRangeValue(
+        frequencyData, 
+        140 + (i * 300), 
+        140 + ((i + 1) * 300)
+      );
+      
+      const segmentHeight = radius * 0.2 * (segmentValue / 255);
+      const outerRadius = radius * 0.7 + segmentHeight;
+      
+      ctx.beginPath();
+      ctx.moveTo(
+        centerX + radius * 0.7 * Math.cos(angle),
+        centerY + radius * 0.7 * Math.sin(angle)
+      );
+      ctx.lineTo(
+        centerX + outerRadius * Math.cos(angle),
+        centerY + outerRadius * Math.sin(angle)
+      );
+      ctx.lineTo(
+        centerX + outerRadius * Math.cos(angle + midSegmentAngle * 0.8),
+        centerY + outerRadius * Math.sin(angle + midSegmentAngle * 0.8)
+      );
+      ctx.lineTo(
+        centerX + radius * 0.7 * Math.cos(angle + midSegmentAngle * 0.8),
+        centerY + radius * 0.7 * Math.sin(angle + midSegmentAngle * 0.8)
+      );
+      ctx.closePath();
+      
+      const hue = 240 + (i * 30) % 120;
+      ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.7)`;
+      ctx.fill();
+    }
+    
+    // Рисуем высокие частоты (точки по краю)
+    const dots = 36;
+    const dotAngle = (2 * Math.PI) / dots;
+    
+    for (let i = 0; i < dots; i++) {
+      const angle = i * dotAngle;
+      const dotValue = this.getFrequencyRangeValue(
+        frequencyData, 
+        4000 + (i * 500), 
+        4000 + ((i + 1) * 500)
+      );
+      
+      const dotRadius = 2 + 4 * (dotValue / 255);
+      const dotDistance = radius * 0.9 + radius * 0.1 * (dotValue / 255);
+      
+      ctx.beginPath();
+      ctx.arc(
+        centerX + dotDistance * Math.cos(angle),
+        centerY + dotDistance * Math.sin(angle),
+        dotRadius,
+        0,
+        2 * Math.PI
+      );
+      ctx.fillStyle = `rgba(255, ${255 - i * 5}, ${i * 5}, 0.9)`;
+      ctx.fill();
+    }
+  }
+
+  getFrequencyRangeValue(frequencyData, lowFreq, highFreq) {
+    const sampleRate = Tone.context.sampleRate;
+    const binSize = sampleRate / frequencyData.length;
+    
+    const startBin = Math.floor(lowFreq / binSize);
+    const endBin = Math.min(
+      Math.floor(highFreq / binSize),
+      frequencyData.length - 1
+    );
+    
+    let sum = 0;
+    for (let i = startBin; i <= endBin; i++) {
+      sum += frequencyData[i];
+    }
+    
+    return sum / (endBin - startBin + 1);
   }
 
   // Сохранение текущего пресета
@@ -868,40 +1051,56 @@ async function loadHistory() {
 }
 
 async function loadSavedCompositions() {
+  const res = await fetch("/my_compositions", {
+    headers: {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    }
+  });
   try {
-    const res = await fetch("/history");
-    const history = await res.json();
+    const res = await fetch("/my_compositions"); // Используем новый endpoint
+    const compositions = await res.json();
+    
     const container = document.getElementById("saved-list");
     container.innerHTML = "";
 
-    const created = history.filter(item => item.type === "composition_created");
-
-    if (created.length === 0) {
+    if (compositions.length === 0) {
       container.innerHTML = "<p class='text-gray-400'>Нет сохранённых композиций.</p>";
       return;
     }
 
-    created.forEach(item => {
+    compositions.forEach(comp => {
       const div = document.createElement("div");
       div.className = "bg-gray-700 p-3 rounded flex justify-between items-center";
+      div.dataset.compositionId = comp.composition_id;
+      
       div.innerHTML = `
-        <span>${item.data.title || `ID: ${item.data.composition_id}`}</span>
-        <button class="load-composition bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm" 
-                data-id="${item.data.composition_id}">
-          Загрузить
-        </button>
+        <span>${comp.title || `ID: ${comp.composition_id}`}</span>
+        <div class="flex space-x-2">
+          <button class="load-composition bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">
+            Загрузить
+          </button>
+          <button class="delete-composition bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm">
+            Удалить
+          </button>
+        </div>
       `;
+      
       container.appendChild(div);
       
-      // Добавляем обработчик для кнопки загрузки
       div.querySelector('.load-composition').addEventListener('click', () => {
-        loadComposition(item.data.composition_id);
+        loadComposition(comp.composition_id);
+      });
+      
+      div.querySelector('.delete-composition').addEventListener('click', () => {
+        deleteComposition(comp.composition_id);
       });
     });
   } catch (err) {
-    console.error("Ошибка загрузки сохраненных композиций:", err);
+    console.error("Ошибка загрузки композиций:", err);
     document.getElementById("saved-list").innerHTML = 
-      "<p class='text-red-400'>Ошибка загрузки сохраненных композиций</p>";
+      "<p class='text-red-400'>Ошибка загрузки</p>";
   }
 }
 
@@ -919,25 +1118,50 @@ async function loadFavorites() {
 
     favorites.forEach(item => {
       const div = document.createElement("div");
-      div.className = "bg-pink-700 p-3 rounded flex justify-between items-center";
+      div.className = "bg-pink-700 p-3 rounded flex justify-between items-center favorite-item";
+      div.setAttribute("data-composition-id", item.composition_id); // Добавляем атрибут
       div.innerHTML = `
         <span>${item.title} (${new Date(item.created).toLocaleString()})</span>
-        <button class="load-composition bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm" 
-                data-id="${item.composition_id}">
-          Загрузить
-        </button>
+        <div class="flex space-x-2">
+          <button class="load-composition bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">
+            Загрузить
+          </button>
+          <button class="remove-favorite bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm">
+            Убрать
+          </button>
+        </div>
       `;
       container.appendChild(div);
       
-      // Добавляем обработчик для кнопки загрузки
+      // Обработчики событий
       div.querySelector('.load-composition').addEventListener('click', () => {
         loadComposition(item.composition_id);
+      });
+      
+      div.querySelector('.remove-favorite').addEventListener('click', async () => {
+        try {
+          const res = await fetch("/add_favorite", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ composition_id: item.composition_id })
+          });
+
+          if (res.ok) {
+            div.remove(); // Удаляем элемент из DOM
+            checkEmptyLists(); // Проверяем пустые списки
+            alert("Удалено из избранного!");
+          } else {
+            throw new Error("Не удалось удалить из избранного");
+          }
+        } catch (err) {
+          console.error("Ошибка удаления из избранного:", err);
+          alert("Ошибка: " + err.message);
+        }
       });
     });
   } catch (err) {
     console.error("Ошибка загрузки избранных композиций:", err);
-    document.getElementById("favorites-list").innerHTML = 
-      "<p class='text-red-400'>Ошибка загрузки избранных композиций</p>";
+    container.innerHTML = "<p class='text-red-400'>Ошибка загрузки избранных композиций</p>";
   }
 }
 
@@ -1032,6 +1256,63 @@ function waitForElement(id, tries = 20) {
       }
     }, 100);
   });
+}
+
+async function deleteComposition(compositionId) {
+  if (!confirm("Вы уверены, что хотите удалить эту композицию? Это действие нельзя отменить.")) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/delete_composition/${compositionId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || "Не удалось удалить композицию");
+    }
+
+    const data = await res.json();
+    if (data.success) {
+      // Удаляем элемент из DOM сразу, без перезагрузки всего списка
+      const itemToRemove = document.querySelector(`[data-composition-id="${compositionId}"]`);
+      if (itemToRemove) {
+        itemToRemove.remove();
+      }
+      
+      // Также проверяем и удаляем из избранного, если оно отображается
+      const favoriteToRemove = document.querySelector(`.favorite-item[data-composition-id="${compositionId}"]`);
+      if (favoriteToRemove) {
+        favoriteToRemove.remove();
+      }
+      
+      // Проверяем, не остались ли пустые списки
+      checkEmptyLists();
+      
+      alert("Композиция успешно удалена!");
+    }
+  } catch (err) {
+    console.error("Ошибка удаления композиции:", err);
+    alert("Ошибка удаления: " + err.message);
+  }
+}
+
+// Функция для проверки пустых списков
+function checkEmptyLists() {
+  const savedList = document.getElementById("saved-list");
+  const favoritesList = document.getElementById("favorites-list");
+  
+  if (savedList.children.length === 0) {
+    savedList.innerHTML = "<p class='text-gray-400'>Нет сохранённых композиций.</p>";
+  }
+  
+  if (favoritesList && favoritesList.children.length === 0) {
+    favoritesList.innerHTML = "<p class='text-gray-400'>Нет избранных композиций.</p>";
+  }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
