@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import json
 
 app = Flask(__name__, static_folder="static")
-app.secret_key = "your_secret_key"
+app.secret_key = "my_secret_key"
 CORS(app, supports_credentials=True)
 
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -161,6 +161,40 @@ def get_favorites():
         return jsonify([
             {"composition_id": row[0], "title": row[1], "created": row[2].isoformat()} for row in favorites
         ])
+    
+@app.route("/get_composition/<int:composition_id>")
+def get_composition(composition_id):
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    with conn.cursor() as cur:
+        # Проверяем, что сессия действительна
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s AND expires_at > NOW()", 
+                   (session["session_id"],))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Invalid or expired session"}), 403
+
+        user_id = result[0]
+        
+        # Проверяем, что композиция принадлежит пользователю
+        cur.execute("""
+            SELECT title, melody_data, bass_data, drums_data 
+            FROM compositions 
+            WHERE composition_id = %s AND user_id = %s
+        """, (composition_id, user_id))
+        composition = cur.fetchone()
+        
+        if not composition:
+            return jsonify({"error": "Composition not found or access denied"}), 404
+        
+        return jsonify({
+                "title": composition[0],
+                "melody": composition[1],
+                "bass": composition[2],
+                "drums": composition[3]
+            })
+
 
 @app.route("/history")
 def get_history():

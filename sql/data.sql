@@ -19,7 +19,7 @@ VALUES (
 
 -- Добавление композиции в избранное
 INSERT INTO favorites (user_id, composition_id)
-VALUES (1, 1)
+VALUES (1, 1);
 
 -- Запись действия в историю
 INSERT INTO user_history (user_id, action_type, action_data)
@@ -27,5 +27,5 @@ VALUES (
   1,
   'composition_created',
   '{"composition_id": 1, "title": "Моя первая фрактальная мелодия"}'
-);
+)
 

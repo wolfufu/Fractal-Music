@@ -62,7 +62,6 @@ class FractalMusicSystem {
     this.setupEventListeners();
     this.updateAllEditors();
     this.drawAllPreviews();
-    this.loadPresetsFromLocalStorage();
   }
   
   initElements() {
@@ -276,64 +275,6 @@ class FractalMusicSystem {
     
     this.updateAllEditors();
     this.drawAllPreviews();
-  }
-
-  // Рендер истории пресетов
-  renderPresetsHistory() {
-    this.elements.presetsHistory.innerHTML = '';
-    
-    if (this.presetsHistory.length === 0) {
-      this.elements.presetsHistory.innerHTML = '<p class="text-gray-400">История пуста</p>';
-      return;
-    }
-    
-    this.presetsHistory.forEach(preset => {
-      const presetElement = document.createElement('div');
-      presetElement.className = 'bg-gray-700 p-3 rounded flex justify-between items-center';
-      presetElement.innerHTML = `
-        <div>
-          <span class="font-medium">Пресет #${preset.id}</span>
-          <span class="text-sm text-gray-400">${preset.date}</span>
-        </div>
-        <div class="space-x-2">
-          <button class="load-preset bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm" data-id="${preset.id}">
-            Загрузить
-          </button>
-          <button class="export-preset bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm" data-id="${preset.id}">
-            Экспорт
-          </button>
-        </div>
-      `;
-      
-      this.elements.presetsHistory.appendChild(presetElement);
-      
-      // Добавляем обработчики для новых кнопок
-      presetElement.querySelector('.load-preset').addEventListener('click', () => {
-        const presetToLoad = this.presetsHistory.find(p => p.id === preset.id);
-        if (presetToLoad) this.loadPreset(presetToLoad);
-      });
-      
-      presetElement.querySelector('.export-preset').addEventListener('click', () => {
-        const presetToExport = this.presetsHistory.find(p => p.id === preset.id);
-        if (presetToExport) {
-          this.downloadObjectAsJson(presetToExport, `fractal_music_preset_${presetToExport.id}`);
-        }
-      });
-    });
-  }
-
-  // Сохранение в LocalStorage
-  savePresetsToLocalStorage() {
-    localStorage.setItem('fractalMusicPresets', JSON.stringify(this.presetsHistory));
-  }
-  
-  // Загрузка из LocalStorage
-  loadPresetsFromLocalStorage() {
-    const savedPresets = localStorage.getItem('fractalMusicPresets');
-    if (savedPresets) {
-      this.presetsHistory = JSON.parse(savedPresets);
-      this.renderPresetsHistory();
-    }
   }
 
   // Экспорт музыки в WAV
@@ -927,43 +868,133 @@ async function loadHistory() {
 }
 
 async function loadSavedCompositions() {
-  const res = await fetch("/history");
-  const history = await res.json();
-  const container = document.getElementById("saved-list");
-  container.innerHTML = "";
+  try {
+    const res = await fetch("/history");
+    const history = await res.json();
+    const container = document.getElementById("saved-list");
+    container.innerHTML = "";
 
-  const created = history.filter(item => item.type === "composition_created");
+    const created = history.filter(item => item.type === "composition_created");
 
-  if (created.length === 0) {
-    container.innerHTML = "<p class='text-gray-400'>Нет сохранённых композиций.</p>";
-    return;
+    if (created.length === 0) {
+      container.innerHTML = "<p class='text-gray-400'>Нет сохранённых композиций.</p>";
+      return;
+    }
+
+    created.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "bg-gray-700 p-3 rounded flex justify-between items-center";
+      div.innerHTML = `
+        <span>${item.data.title || `ID: ${item.data.composition_id}`}</span>
+        <button class="load-composition bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm" 
+                data-id="${item.data.composition_id}">
+          Загрузить
+        </button>
+      `;
+      container.appendChild(div);
+      
+      // Добавляем обработчик для кнопки загрузки
+      div.querySelector('.load-composition').addEventListener('click', () => {
+        loadComposition(item.data.composition_id);
+      });
+    });
+  } catch (err) {
+    console.error("Ошибка загрузки сохраненных композиций:", err);
+    document.getElementById("saved-list").innerHTML = 
+      "<p class='text-red-400'>Ошибка загрузки сохраненных композиций</p>";
   }
-
-  created.forEach(item => {
-    const div = document.createElement("div");
-    div.className = "bg-gray-700 p-3 rounded";
-    div.textContent = item.data.title || `ID: ${item.data.composition_id}`;
-    container.appendChild(div);
-  });
 }
 
 async function loadFavorites() {
-  const res = await fetch("/favorites");
-  const favorites = await res.json();
-  const container = document.getElementById("favorites-list");
-  container.innerHTML = "";
+  try {
+    const res = await fetch("/favorites");
+    const favorites = await res.json();
+    const container = document.getElementById("favorites-list");
+    container.innerHTML = "";
 
-  if (favorites.length === 0) {
-    container.innerHTML = "<p class='text-gray-400'>Нет избранных композиций.</p>";
-    return;
+    if (favorites.length === 0) {
+      container.innerHTML = "<p class='text-gray-400'>Нет избранных композиций.</p>";
+      return;
+    }
+
+    favorites.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "bg-pink-700 p-3 rounded flex justify-between items-center";
+      div.innerHTML = `
+        <span>${item.title} (${new Date(item.created).toLocaleString()})</span>
+        <button class="load-composition bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm" 
+                data-id="${item.composition_id}">
+          Загрузить
+        </button>
+      `;
+      container.appendChild(div);
+      
+      // Добавляем обработчик для кнопки загрузки
+      div.querySelector('.load-composition').addEventListener('click', () => {
+        loadComposition(item.composition_id);
+      });
+    });
+  } catch (err) {
+    console.error("Ошибка загрузки избранных композиций:", err);
+    document.getElementById("favorites-list").innerHTML = 
+      "<p class='text-red-400'>Ошибка загрузки избранных композиций</p>";
   }
+}
 
-  favorites.forEach(item => {
-    const div = document.createElement("div");
-    div.className = "bg-pink-700 p-3 rounded";
-    div.textContent = `${item.title} (${new Date(item.created).toLocaleString()})`;
-    container.appendChild(div);
-  });
+async function loadComposition(compositionId) {
+  try {
+    const res = await fetch(`/get_composition/${compositionId}`);
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
+    const composition = await res.json();
+    
+    if (window.fractalSystem) {
+      // Загружаем данные в систему, сохраняя существующие canvas и ctx
+      window.fractalSystem.melody = {
+        ...window.fractalSystem.melody, // сохраняем существующие свойства
+        type: composition.melody.type,
+        depth: composition.melody.depth,
+        rules: composition.melody.rules
+      };
+      
+      window.fractalSystem.bass = {
+        ...window.fractalSystem.bass,
+        type: composition.bass.type,
+        depth: composition.bass.depth,
+        rules: composition.bass.rules
+      };
+      
+      window.fractalSystem.drums = {
+        ...window.fractalSystem.drums,
+        type: composition.drums.type,
+        depth: composition.drums.depth,
+        rules: composition.drums.rules
+      };
+      
+      // Обновляем UI
+      window.fractalSystem.elements.melodyType.value = composition.melody.type;
+      window.fractalSystem.elements.melodyDepth.value = composition.melody.depth;
+      window.fractalSystem.elements.melodyDepthValue.textContent = composition.melody.depth;
+      
+      window.fractalSystem.elements.bassType.value = composition.bass.type;
+      window.fractalSystem.elements.bassDepth.value = composition.bass.depth;
+      window.fractalSystem.elements.bassDepthValue.textContent = composition.bass.depth;
+      
+      window.fractalSystem.elements.drumsType.value = composition.drums.type;
+      window.fractalSystem.elements.drumsDepth.value = composition.drums.depth;
+      window.fractalSystem.elements.drumsDepthValue.textContent = composition.drums.depth;
+      
+      // Обновляем редакторы и превью
+      window.fractalSystem.updateAllEditors();
+      window.fractalSystem.drawAllPreviews();
+      
+      alert(`Композиция "${composition.title}" успешно загружена!`);
+    }
+  } catch (err) {
+    console.error("Ошибка загрузки композиции:", err);
+    alert("Ошибка загрузки композиции: " + err.message);
+  }
 }
 
 function setupTabs() {
@@ -997,7 +1028,7 @@ function waitForElement(id, tries = 20) {
       }
       if (--tries <= 0) {
         clearInterval(interval);
-        reject(`❌ Элемент #${id} не найден`);
+        reject(`Элемент #${id} не найден`);
       }
     }, 100);
   });
@@ -1005,9 +1036,6 @@ function waitForElement(id, tries = 20) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   checkAuth();
-  loadHistory();
-  loadSavedCompositions();
-  loadFavorites();
   setupTabs();
 
   document.getElementById("save-to-db").addEventListener("click", saveToDatabase);
@@ -1016,11 +1044,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     await waitForElement("melody-type");
     window.fractalSystem = new FractalMusicSystem();
+    
+    // Теперь загружаем композиции после инициализации системы
+    loadSavedCompositions();
+    loadFavorites();
   } catch (e) {
     console.error(e);
   }
 });
-
-
-
-
