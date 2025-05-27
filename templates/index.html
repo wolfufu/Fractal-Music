@@ -9,7 +9,7 @@
 <body class="bg-gray-900 text-white font-sans min-h-screen p-8">
   <div class="max-w-6xl mx-auto">
 
-    <h1 class="text-3xl font-bold mb-6">🎵 Фрактальная музыкальная система</h1>
+    <h1 class="text-3xl font-bold mb-6">Фрактальная музыкальная система</h1>
     
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <!-- Основная мелодия -->
@@ -104,21 +104,46 @@
         </button>
       </div>
       <div class="mt-4 grid grid-cols-2 gap-4">
-        <button id="save-preset" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded">
-          Сохранить пресет
-        </button>
         <button id="export-music" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
           Экспорт музыки
         </button>
       </div>
     </div>
 
-    <!-- История пресетов -->
+    <div class="mt-4 flex justify-between">
+      <button id="save-to-db" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded">
+        Сохранить в базу
+      </button>
+      <button id="add-to-favorites" class="bg-pink-500 hover:bg-pink-600 px-4 py-2 rounded">
+        В избранное
+      </button>
+      <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">
+        Выйти
+      </a>
+    </div>
+
     <div class="mt-6 bg-gray-800 p-6 rounded-lg">
-      <h2 class="text-xl font-semibold mb-4">История пресетов</h2>
-      <div id="presets-history" class="space-y-2 max-h-64 overflow-y-auto">
-        <!-- Пресеты будут добавляться сюда -->
+      <h2 class="text-xl font-semibold mb-4">Мои композиции</h2>
+
+      <div class="flex space-x-4 mb-4">
+        <button id="tab-saved" class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Сохранённые</button>
+        <button id="tab-favorites" class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Избранные</button>
       </div>
+
+      <div id="saved-list" class="space-y-2">
+        <p class="text-sm text-gray-400">Загрузка сохранённых...</p>
+      </div>
+      <div id="favorites-list" class="space-y-2 hidden">
+        <p class="text-sm text-gray-400">Загрузка избранных...</p>
+      </div>
+    </div>
+
+
+    <div class="mt-6 bg-gray-800 p-6 rounded-lg">
+      <h2 class="text-xl font-semibold mb-4">История действий</h2>
+      <ul id="user-history" class="space-y-2 text-sm text-gray-300">
+        <!-- История будет загружена сюда -->
+      </ul>
     </div>
   </div>
   <script src="/static/script.js"></script>

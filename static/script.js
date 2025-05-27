@@ -1,3 +1,67 @@
+async function checkAuth() {
+  const res = await fetch("/check_auth");
+  const data = await res.json();
+  if (!data.authenticated) {
+    window.location.href = "/login";
+  }
+}
+
+async function saveToDatabase() {
+  const payload = {
+    title: prompt("Введите название композиции") || "Без названия",
+    melody: fractalSystem.melody,
+    bass: fractalSystem.bass,
+    drums: fractalSystem.drums
+  };
+  const res = await fetch("/save_composition", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.composition_id) {
+    alert("Сохранено в базу!");
+    loadHistory();
+    compositionId = data.composition_id;
+  }
+}
+
+async function addToFavorites() {
+  if (!compositionId) {
+    alert("Сначала сохраните композицию.");
+    return;
+  }
+  const res = await fetch("/add_favorite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ composition_id: compositionId })
+  });
+  const data = await res.json();
+  if (data.success) alert("Добавлено в избранное!");
+}
+
+async function loadHistory() {
+  const res = await fetch("/history");
+  const history = await res.json();
+  const container = document.getElementById("user-history");
+  container.innerHTML = "";
+  history.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = `[${item.time}] ${item.type}: ${item.data.title || JSON.stringify(item.data)}`;
+    container.appendChild(li);
+  });
+}
+
+let compositionId = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkAuth();
+  loadHistory();
+  document.getElementById("save-to-db").addEventListener("click", saveToDatabase);
+  document.getElementById("add-to-favorites").addEventListener("click", addToFavorites);
+});
+
+
 class FractalMusicSystem {
   constructor() {
     this.presetsHistory = [];
@@ -819,4 +883,75 @@ class FractalMusicSystem {
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
   new FractalMusicSystem();
+});
+
+async function loadSavedCompositions() {
+  const res = await fetch("/history");
+  const history = await res.json();
+  const container = document.getElementById("saved-list");
+  container.innerHTML = "";
+
+  const created = history.filter(item => item.type === "composition_created");
+
+  if (created.length === 0) {
+    container.innerHTML = "<p class='text-gray-400'>Нет сохранённых композиций.</p>";
+    return;
+  }
+
+  created.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "bg-gray-700 p-3 rounded";
+    div.textContent = item.data.title || `ID: ${item.data.composition_id}`;
+    container.appendChild(div);
+  });
+}
+
+async function loadFavorites() {
+  const res = await fetch("/favorites");
+  const favorites = await res.json();
+  const container = document.getElementById("favorites-list");
+  container.innerHTML = "";
+
+  if (favorites.length === 0) {
+    container.innerHTML = "<p class='text-gray-400'>Нет избранных композиций.</p>";
+    return;
+  }
+
+  favorites.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "bg-pink-700 p-3 rounded";
+    div.textContent = `${item.title} (${new Date(item.created).toLocaleString()})`;
+    container.appendChild(div);
+  });
+}
+
+function setupTabs() {
+  const savedTab = document.getElementById("tab-saved");
+  const favoritesTab = document.getElementById("tab-favorites");
+  const savedList = document.getElementById("saved-list");
+  const favoritesList = document.getElementById("favorites-list");
+
+  savedTab.addEventListener("click", () => {
+    savedList.classList.remove("hidden");
+    favoritesList.classList.add("hidden");
+    savedTab.classList.add("bg-blue-600");
+    favoritesTab.classList.remove("bg-blue-600");
+  });
+
+  favoritesTab.addEventListener("click", () => {
+    favoritesList.classList.remove("hidden");
+    savedList.classList.add("hidden");
+    favoritesTab.classList.add("bg-blue-600");
+    savedTab.classList.remove("bg-blue-600");
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkAuth();
+  loadHistory();
+  loadSavedCompositions();
+  loadFavorites();
+  setupTabs();
+  document.getElementById("save-to-db").addEventListener("click", saveToDatabase);
+  document.getElementById("add-to-favorites").addEventListener("click", addToFavorites);
 });

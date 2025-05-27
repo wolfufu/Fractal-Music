@@ -1,10 +1,178 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, jsonify, session, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_cors import CORS
+import psycopg2
+import uuid
+from datetime import datetime, timedelta
+import json
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static")
+app.secret_key = "your_secret_key"
+CORS(app, supports_credentials=True)
+
+conn = psycopg2.connect(
+    dbname="fractune",
+    user="postgres",
+    password="12345",
+    host="localhost",
+    port="5432"
+)
 
 @app.route("/")
 def index():
+    if "session_id" not in session:
+        return redirect("/login")
     return render_template("index.html")
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        data = request.form
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO users (username, email, password_hash)
+                VALUES (%s, %s, %s)
+                RETURNING user_id
+            """, (data['username'], data['email'], generate_password_hash(data['password'])))
+            user_id = cur.fetchone()[0]
+            conn.commit()
+            return redirect("/login")
+    return render_template("register.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        data = request.form
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id, password_hash FROM users WHERE email = %s", (data["email"],))
+            user = cur.fetchone()
+            if user and check_password_hash(user[1], data["password"]):
+                user_id = user[0]
+                session_id = str(uuid.uuid4())
+                expires = datetime.utcnow() + timedelta(days=7)
+                cur.execute("""
+                    INSERT INTO user_sessions (session_id, user_id, expires_at, ip_address)
+                    VALUES (%s, %s, %s, %s)
+                """, (session_id, user_id, expires, request.remote_addr))
+                session["session_id"] = session_id
+                conn.commit()
+                return redirect("/")
+        return "Неверный email или пароль", 403
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.pop("session_id", None)
+    return redirect("/login")
+
+@app.route("/save_composition", methods=["POST"])
+def save_composition():
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json()
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Invalid session"}), 403
+
+        user_id = result[0]
+        cur.execute("""
+            INSERT INTO compositions (user_id, title, melody_data, bass_data, drums_data)
+            VALUES (%s, %s, %s, %s, %s) RETURNING composition_id
+        """, (user_id, data["title"], json.dumps(data["melody"]), json.dumps(data["bass"]), json.dumps(data["drums"])))
+        composition_id = cur.fetchone()[0]
+
+        cur.execute("""
+            INSERT INTO user_history (user_id, action_type, action_data)
+            VALUES (%s, 'composition_created', %s)
+        """, (user_id, json.dumps({"composition_id": composition_id, "title": data["title"]})))
+        conn.commit()
+        return jsonify({"composition_id": composition_id})
+
+@app.route("/add_favorite", methods=["POST"])
+def add_favorite():
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json()
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Invalid session"}), 403
+        user_id = result[0]
+        cur.execute("""
+            INSERT INTO favorites (user_id, composition_id) 
+            VALUES (%s, %s) ON CONFLICT DO NOTHING
+        """, (user_id, data["composition_id"]))
+
+        cur.execute("""
+            INSERT INTO user_history (user_id, action_type, action_data)
+            VALUES (%s, 'favorite_added', %s)
+        """, (user_id, json.dumps({"composition_id": data["composition_id"]})))
+
+        conn.commit()
+        return jsonify({"success": True})
+
+@app.route("/favorites")
+def get_favorites():
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Invalid session"}), 403
+
+        user_id = result[0]
+        cur.execute("""
+            SELECT c.composition_id, c.title, c.creation_date
+            FROM favorites f
+            JOIN compositions c ON f.composition_id = c.composition_id
+            WHERE f.user_id = %s
+            ORDER BY f.added_at DESC
+        """, (user_id,))
+        favorites = cur.fetchall()
+
+        return jsonify([
+            {"composition_id": row[0], "title": row[1], "created": row[2].isoformat()} for row in favorites
+        ])
+
+@app.route("/history")
+def get_history():
+    if "session_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Invalid session"}), 403
+        user_id = result[0]
+        cur.execute("""
+            SELECT action_type, action_time, action_data
+            FROM user_history
+            WHERE user_id = %s
+            ORDER BY action_time DESC LIMIT 50
+        """, (user_id,))
+        history = cur.fetchall()
+        return jsonify([{
+            "type": row[0],
+            "time": row[1].isoformat(),
+            "data": row[2]
+        } for row in history])
+
+@app.route("/check_auth")
+def check_auth():
+    if "session_id" not in session:
+        return jsonify({"authenticated": False})
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s", (session["session_id"],))
+        user = cur.fetchone()
+        return jsonify({"authenticated": bool(user)})
 
 if __name__ == "__main__":
     app.run(debug=True)
