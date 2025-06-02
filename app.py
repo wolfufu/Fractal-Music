@@ -60,8 +60,9 @@ def login():
                 session["session_id"] = session_id
                 conn.commit()
                 return redirect("/")
-        return "Неверный email или пароль", 403
+        return render_template("login.html", error="Неверный email или пароль")
     return render_template("login.html")
+
 
 @app.route("/logout")
 def logout():

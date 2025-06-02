@@ -282,97 +282,72 @@ class FractalMusicSystem {
 
   drawCircleVisualizer(frequencyData) {
     const { ctx, canvas } = this.circleVisualizer;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    const radius = Math.min(canvas.width, canvas.height) * 0.4;
-    
-    // Рисуем базовый круг
+    const baseRadius = Math.min(canvas.width, canvas.height) * 0.35;
+
+    // Настройки glow-эффекта
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00ffff';
+
+    // Фоновый круг
     ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.arc(centerX, centerY, baseRadius, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 2;
     ctx.stroke();
-    
-    // Анализируем частоты для разных диапазонов
+
+    // Бас — пульсация
     const bass = this.getFrequencyRangeValue(frequencyData, 20, 140);
-    const mid = this.getFrequencyRangeValue(frequencyData, 140, 4000);
-    const high = this.getFrequencyRangeValue(frequencyData, 4000, 20000);
-    
-    // Рисуем реакцию на басы (внутренний круг)
-    const bassRadius = radius * 0.3 * (1 + bass / 255);
+    const bassRadius = baseRadius * 0.6 * (1 + bass / 255);
     ctx.beginPath();
     ctx.arc(centerX, centerY, bassRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = 'rgba(100, 200, 255, 0.7)';
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.4)';
     ctx.fill();
-    
-    // Рисуем средние частоты (сегменты)
-    const segments = 12;
-    const midSegmentAngle = (2 * Math.PI) / segments;
-    
+
+    // Средние частоты — лучи
+    const segments = 32;
+    const angleStep = (2 * Math.PI) / segments;
     for (let i = 0; i < segments; i++) {
-      const angle = i * midSegmentAngle;
-      const segmentValue = this.getFrequencyRangeValue(
-        frequencyData, 
-        140 + (i * 300), 
-        140 + ((i + 1) * 300)
-      );
-      
-      const segmentHeight = radius * 0.2 * (segmentValue / 255);
-      const outerRadius = radius * 0.7 + segmentHeight;
-      
+      const angle = i * angleStep;
+      const midValue = this.getFrequencyRangeValue(frequencyData, 150 + i * 100, 200 + i * 100);
+      const dynamicLength = baseRadius * 0.3 + midValue * 0.5;
+
+      const x1 = centerX + baseRadius * Math.cos(angle);
+      const y1 = centerY + baseRadius * Math.sin(angle);
+      const x2 = centerX + (baseRadius + dynamicLength) * Math.cos(angle);
+      const y2 = centerY + (baseRadius + dynamicLength) * Math.sin(angle);
+
       ctx.beginPath();
-      ctx.moveTo(
-        centerX + radius * 0.7 * Math.cos(angle),
-        centerY + radius * 0.7 * Math.sin(angle)
-      );
-      ctx.lineTo(
-        centerX + outerRadius * Math.cos(angle),
-        centerY + outerRadius * Math.sin(angle)
-      );
-      ctx.lineTo(
-        centerX + outerRadius * Math.cos(angle + midSegmentAngle * 0.8),
-        centerY + outerRadius * Math.sin(angle + midSegmentAngle * 0.8)
-      );
-      ctx.lineTo(
-        centerX + radius * 0.7 * Math.cos(angle + midSegmentAngle * 0.8),
-        centerY + radius * 0.7 * Math.sin(angle + midSegmentAngle * 0.8)
-      );
-      ctx.closePath();
-      
-      const hue = 240 + (i * 30) % 120;
-      ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.7)`;
-      ctx.fill();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = `hsla(${i * 12}, 100%, 60%, 0.8)`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
-    
-    // Рисуем высокие частоты (точки по краю)
-    const dots = 36;
-    const dotAngle = (2 * Math.PI) / dots;
-    
+
+    // Высокие частоты — точки
+    const dots = 64;
     for (let i = 0; i < dots; i++) {
-      const angle = i * dotAngle;
-      const dotValue = this.getFrequencyRangeValue(
-        frequencyData, 
-        4000 + (i * 500), 
-        4000 + ((i + 1) * 500)
-      );
-      
-      const dotRadius = 2 + 4 * (dotValue / 255);
-      const dotDistance = radius * 0.9 + radius * 0.1 * (dotValue / 255);
-      
+      const angle = i * (2 * Math.PI / dots);
+      const highValue = this.getFrequencyRangeValue(frequencyData, 5000 + i * 300, 5300 + i * 300);
+      const dotRadius = 2 + 4 * (highValue / 255);
+      const dotDist = baseRadius + 30 + (highValue / 255) * 20;
+
+      const dx = centerX + dotDist * Math.cos(angle);
+      const dy = centerY + dotDist * Math.sin(angle);
+
       ctx.beginPath();
-      ctx.arc(
-        centerX + dotDistance * Math.cos(angle),
-        centerY + dotDistance * Math.sin(angle),
-        dotRadius,
-        0,
-        2 * Math.PI
-      );
-      ctx.fillStyle = `rgba(255, ${255 - i * 5}, ${i * 5}, 0.9)`;
+      ctx.arc(dx, dy, dotRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(255, ${100 + i}, ${255 - i}, 0.9)`;
       ctx.fill();
     }
   }
+
 
   getFrequencyRangeValue(frequencyData, lowFreq, highFreq) {
     const sampleRate = Tone.context.sampleRate;
