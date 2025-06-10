@@ -69,6 +69,11 @@ class FractalMusicSystem {
       ctx: document.getElementById('oscilloscope').getContext('2d')
     };
     
+    this.circleVisualizer = {
+      canvas: document.getElementById('circle-visualizer'),
+      ctx: document.getElementById('circle-visualizer').getContext('2d')
+    };
+    
     // Анализаторы для визуализации
     this.waveformAnalyser = new Tone.Waveform(256);
     this.analyser = new Tone.Analyser("fft", 64);
@@ -132,13 +137,13 @@ class FractalMusicSystem {
       this.melody.type = e.target.value;
       this.melody.rules = this.getDefaultRules(this.melody.type);
       this.updateEditor('melody');
-      this.animatePreview('melody');
+      this.drawPreview('melody');
     });
     
     this.elements.melodyApply.addEventListener('click', () => {
       try {
         this.melody.rules = JSON.parse(this.elements.melodyRules.value);
-        this.animatePreview('melody');
+        this.drawPreview('melody');
       } catch (e) {
         alert(`Ошибка в формате JSON: ${e.message}`);
       }
@@ -147,13 +152,13 @@ class FractalMusicSystem {
     this.elements.melodyReset.addEventListener('click', () => {
       this.melody.rules = this.getDefaultRules(this.melody.type);
       this.updateEditor('melody');
-      this.animatePreview('melody');
+      this.drawPreview('melody');
     });
     
     this.elements.melodyDepth.addEventListener('input', (e) => {
       this.melody.depth = parseInt(e.target.value);
       this.elements.melodyDepthValue.textContent = this.melody.depth;
-      this.animatePreview('melody');
+      this.drawPreview('melody');
     });
     
     // Bass controls
@@ -161,13 +166,13 @@ class FractalMusicSystem {
       this.bass.type = e.target.value;
       this.bass.rules = this.getDefaultRules(this.bass.type);
       this.updateEditor('bass');
-      this.animatePreview('bass');
+      this.drawPreview('bass');
     });
     
     this.elements.bassApply.addEventListener('click', () => {
       try {
         this.bass.rules = JSON.parse(this.elements.bassRules.value);
-        this.animatePreview('bass');
+        this.drawPreview('bass');
       } catch (e) {
         alert(`Ошибка в формате JSON: ${e.message}`);
       }
@@ -176,13 +181,13 @@ class FractalMusicSystem {
     this.elements.bassReset.addEventListener('click', () => {
       this.bass.rules = this.getDefaultRules(this.bass.type);
       this.updateEditor('bass');
-      this.animatePreview('bass');
+      this.drawPreview('bass');
     });
     
     this.elements.bassDepth.addEventListener('input', (e) => {
       this.bass.depth = parseInt(e.target.value);
       this.elements.bassDepthValue.textContent = this.bass.depth;
-      this.animatePreview('bass');
+      this.drawPreview('bass');
     });
     
     // Drums controls
@@ -190,13 +195,13 @@ class FractalMusicSystem {
       this.drums.type = e.target.value;
       this.drums.rules = this.getDefaultRules(this.drums.type);
       this.updateEditor('drums');
-      this.animatePreview('drums');
+      this.drawPreview('drums');
     });
     
     this.elements.drumsApply.addEventListener('click', () => {
       try {
         this.drums.rules = JSON.parse(this.elements.drumsRules.value);
-        this.animatePreview('drums');
+        this.drawPreview('drums');
       } catch (e) {
         alert(`Ошибка в формате JSON: ${e.message}`);
       }
@@ -205,13 +210,13 @@ class FractalMusicSystem {
     this.elements.drumsReset.addEventListener('click', () => {
       this.drums.rules = this.getDefaultRules(this.drums.type);
       this.updateEditor('drums');
-      this.animatePreview('drums');
+      this.drawPreview('drums');
     });
     
     this.elements.drumsDepth.addEventListener('input', (e) => {
       this.drums.depth = parseInt(e.target.value);
       this.elements.drumsDepthValue.textContent = this.drums.depth;
-      this.animatePreview('drums');
+      this.drawPreview('drums');
     });
     
     // Playback controls
@@ -241,6 +246,7 @@ class FractalMusicSystem {
       
       // Отрисовываем визуализации
       this.drawOscilloscope(waveform);
+      this.drawCircleVisualizer(frequencyData);
     };
     
     draw();
@@ -273,6 +279,75 @@ class FractalMusicSystem {
     ctx.lineTo(canvas.width, canvas.height / 2);
     ctx.stroke();
   }
+
+  drawCircleVisualizer(frequencyData) {
+    const { ctx, canvas } = this.circleVisualizer;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const baseRadius = Math.min(canvas.width, canvas.height) * 0.35;
+
+    // Настройки glow-эффекта
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00ffff';
+
+    // Фоновый круг
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, baseRadius, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Бас — пульсация
+    const bass = this.getFrequencyRangeValue(frequencyData, 20, 140);
+    const bassRadius = baseRadius * 0.6 * (1 + bass / 255);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, bassRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.4)';
+    ctx.fill();
+
+    // Средние частоты — лучи
+    const segments = 32;
+    const angleStep = (2 * Math.PI) / segments;
+    for (let i = 0; i < segments; i++) {
+      const angle = i * angleStep;
+      const midValue = this.getFrequencyRangeValue(frequencyData, 150 + i * 100, 200 + i * 100);
+      const dynamicLength = baseRadius * 0.3 + midValue * 0.5;
+
+      const x1 = centerX + baseRadius * Math.cos(angle);
+      const y1 = centerY + baseRadius * Math.sin(angle);
+      const x2 = centerX + (baseRadius + dynamicLength) * Math.cos(angle);
+      const y2 = centerY + (baseRadius + dynamicLength) * Math.sin(angle);
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = `hsla(${i * 12}, 100%, 60%, 0.8)`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Высокие частоты — точки
+    const dots = 64;
+    for (let i = 0; i < dots; i++) {
+      const angle = i * (2 * Math.PI / dots);
+      const highValue = this.getFrequencyRangeValue(frequencyData, 5000 + i * 300, 5300 + i * 300);
+      const dotRadius = 2 + 4 * (highValue / 255);
+      const dotDist = baseRadius + 30 + (highValue / 255) * 20;
+
+      const dx = centerX + dotDist * Math.cos(angle);
+      const dy = centerY + dotDist * Math.sin(angle);
+
+      ctx.beginPath();
+      ctx.arc(dx, dy, dotRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(255, ${100 + i}, ${255 - i}, 0.9)`;
+      ctx.fill();
+    }
+  }
+
 
   getFrequencyRangeValue(frequencyData, lowFreq, highFreq) {
     const sampleRate = Tone.context.sampleRate;
@@ -446,58 +521,11 @@ class FractalMusicSystem {
   }
   
   drawAllPreviews() {
-    this.animatePreview('melody');
-    this.animatePreview('bass');
-    this.animatePreview('drums');
+    this.drawPreview('melody');
+    this.drawPreview('bass');
+    this.drawPreview('drums');
   }
-
-  animatePreview(component) {
-    const target = this[component];
-    const originalDepth = target.depth;
-    let tempDepth = 1;
-    
-    if (!('depth' in this[component])) {
-      this.drawPreview(component);
-      return;
-    }
-
-    if (this[component].type === 'mandelbrot') {
-      let frame = 0;
-      const totalFrames = 30;
-      const startZoom = 0.5;
-      const endZoom = this[component].rules.zoom || 1;
-
-      const animate = () => {
-        const progress = frame / totalFrames;
-        const currentZoom = startZoom + (endZoom - startZoom) * progress;
-        this[component].rules.zoom = currentZoom;
-        this.drawPreview(component);
-
-        frame++;
-        if (frame <= totalFrames) {
-          requestAnimationFrame(animate);
-        }
-      };
-
-      animate();
-      return;
-    }
-
-    const step = () => {
-      target.depth = tempDepth;
-      this.drawPreview(component);
-      tempDepth++;
-
-      if (tempDepth <= originalDepth) {
-        setTimeout(() => requestAnimationFrame(step), 300); // небольшая задержка
-      } else {
-        target.depth = originalDepth; // восстановить
-      }
-    };
-
-    step();
-  }
-
+  
   drawPreview(component) {
     const { ctx, canvas, type, rules, depth } = this[component];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -733,25 +761,20 @@ class FractalMusicSystem {
   playAll() {
     Tone.Transport.cancel();
     Tone.Transport.bpm.value = 120;
-
+    
+    // Основная мелодия
     const melodyPattern = this.generateMusicPattern('melody');
     const melodyPart = new Tone.Part((time, note) => {
-      this.melodySynth.triggerAttackRelease(
-        this.getNoteForMelody(note.note),
-        note.duration,
-        time,
-        note.velocity
-      );
+      this.melodySynth.triggerAttackRelease(note.note, note.duration, time);
     }, melodyPattern.map((note, i) => ({
       time: i * 0.5,
-      note: note.note,
-      duration: note.duration,
-      velocity: note.velocity
+      note: this.getNoteForMelody(note),
+      duration: "8n"
     })));
     melodyPart.loop = true;
     melodyPart.loopEnd = "4m";
     melodyPart.start(0);
-
+    
     // Басовая линия
     const bassPattern = this.generateMusicPattern('bass');
     const bassPart = new Tone.Part((time, note) => {
@@ -826,19 +849,12 @@ class FractalMusicSystem {
     const { type, depth, rules } = this[component];
     const pattern = [];
     const complexity = depth * 2;
-    const durations = ["8n", "16n", "4n"];
-
-    const arpeggioPattern = [0, 2, 4, 7]; // мажорное арпеджио
 
     switch(type) {
       case 'tree':
-        for (let i = 0; i < complexity * (rules.branches || 2); i++) {
-          const base = i % 7;
-          pattern.push({
-            note: base + (arpeggioPattern[i % arpeggioPattern.length] % 5),
-            duration: durations[i % durations.length],
-            velocity: 0.5 + Math.random() * 0.5
-          });
+        const branches = rules.branches || 2;
+        for (let i = 0; i < complexity * branches; i++) {
+          pattern.push(i % 7);
         }
         break;
 
@@ -853,12 +869,10 @@ class FractalMusicSystem {
         break;
 
       case 'mandelbrot':
-        for (let i = 0; i < (rules.maxIterations || 100); i += 2) {
-          pattern.push({
-            note: (i * i) % 8,
-            duration: durations[(i / 2) % durations.length],
-            velocity: 0.3 + Math.random() * 0.7
-          });
+        const maxIterations = rules.maxIterations || 100;
+        for (let i = 0; i < maxIterations; i++) {
+          const normalized = Math.floor(i / maxIterations * 7);
+          pattern.push(normalized);
         }
         break;
 
@@ -884,14 +898,6 @@ class FractalMusicSystem {
     }
 
     return pattern;
-  }
-
-  getChordForMelody(index) {
-    const base = ["C4", "D4", "E4", "F4", "G4", "A4", "B4"];
-    const root = base[index % base.length];
-    const intervals = [0, 4, 7];
-    const midi = Tone.Frequency(root).toMidi();
-    return intervals.map(i => Tone.Frequency(midi + i, "midi").toNote());
   }
   
   getNoteForMelody(index) {
