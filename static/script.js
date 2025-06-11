@@ -69,11 +69,6 @@ class FractalMusicSystem {
       ctx: document.getElementById('oscilloscope').getContext('2d')
     };
     
-    this.circleVisualizer = {
-      canvas: document.getElementById('circle-visualizer'),
-      ctx: document.getElementById('circle-visualizer').getContext('2d')
-    };
-    
     // Анализаторы для визуализации
     this.waveformAnalyser = new Tone.Waveform(256);
     this.analyser = new Tone.Analyser("fft", 64);
@@ -246,7 +241,6 @@ class FractalMusicSystem {
       
       // Отрисовываем визуализации
       this.drawOscilloscope(waveform);
-      this.drawCircleVisualizer(frequencyData);
     };
     
     draw();
@@ -279,75 +273,6 @@ class FractalMusicSystem {
     ctx.lineTo(canvas.width, canvas.height / 2);
     ctx.stroke();
   }
-
-  drawCircleVisualizer(frequencyData) {
-    const { ctx, canvas } = this.circleVisualizer;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const baseRadius = Math.min(canvas.width, canvas.height) * 0.35;
-
-    // Настройки glow-эффекта
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = '#00ffff';
-
-    // Фоновый круг
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, baseRadius, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Бас — пульсация
-    const bass = this.getFrequencyRangeValue(frequencyData, 20, 140);
-    const bassRadius = baseRadius * 0.6 * (1 + bass / 255);
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, bassRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.4)';
-    ctx.fill();
-
-    // Средние частоты — лучи
-    const segments = 32;
-    const angleStep = (2 * Math.PI) / segments;
-    for (let i = 0; i < segments; i++) {
-      const angle = i * angleStep;
-      const midValue = this.getFrequencyRangeValue(frequencyData, 150 + i * 100, 200 + i * 100);
-      const dynamicLength = baseRadius * 0.3 + midValue * 0.5;
-
-      const x1 = centerX + baseRadius * Math.cos(angle);
-      const y1 = centerY + baseRadius * Math.sin(angle);
-      const x2 = centerX + (baseRadius + dynamicLength) * Math.cos(angle);
-      const y2 = centerY + (baseRadius + dynamicLength) * Math.sin(angle);
-
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.strokeStyle = `hsla(${i * 12}, 100%, 60%, 0.8)`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-    // Высокие частоты — точки
-    const dots = 64;
-    for (let i = 0; i < dots; i++) {
-      const angle = i * (2 * Math.PI / dots);
-      const highValue = this.getFrequencyRangeValue(frequencyData, 5000 + i * 300, 5300 + i * 300);
-      const dotRadius = 2 + 4 * (highValue / 255);
-      const dotDist = baseRadius + 30 + (highValue / 255) * 20;
-
-      const dx = centerX + dotDist * Math.cos(angle);
-      const dy = centerY + dotDist * Math.sin(angle);
-
-      ctx.beginPath();
-      ctx.arc(dx, dy, dotRadius, 0, 2 * Math.PI);
-      ctx.fillStyle = `rgba(255, ${100 + i}, ${255 - i}, 0.9)`;
-      ctx.fill();
-    }
-  }
-
 
   getFrequencyRangeValue(frequencyData, lowFreq, highFreq) {
     const sampleRate = Tone.context.sampleRate;
