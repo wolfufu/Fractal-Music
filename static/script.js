@@ -120,9 +120,7 @@ class FractalMusicSystem {
       playDrums: document.getElementById('play-drums'),
 
       // Presets
-      savePreset: document.getElementById('save-preset'),
       exportMusic: document.getElementById('export-music'),
-      presetsHistory: document.getElementById('presets-history'),
 
       melodyAxiom: document.getElementById('melody-axiom'),
       melodyRulesJson: document.getElementById('melody-rules-json'),
@@ -189,7 +187,6 @@ class FractalMusicSystem {
       this.playComponent('drums');
     });
 
-    this.elements.savePreset.addEventListener('click', () => this.saveCurrentPreset());
     this.elements.exportMusic.addEventListener('click', () => this.exportMusic());
   }
 
@@ -254,74 +251,6 @@ class FractalMusicSystem {
     return sum / (endBin - startBin + 1);
   }
 
-  // Сохранение текущего пресета
-  saveCurrentPreset() {
-    const preset = {
-      id: Date.now(),
-      date: new Date().toLocaleString(),
-      melody: {
-        type: this.melody.type,
-        depth: this.melody.depth,
-        rules: this.melody.rules
-      },
-      bass: {
-        type: this.bass.type,
-        depth: this.bass.depth,
-        rules: this.bass.rules
-      },
-      drums: {
-        type: this.drums.type,
-        depth: this.drums.depth,
-        rules: this.drums.rules
-      }
-    };
-
-    try {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(preset, null, 2));
-      const a = document.createElement('a');
-      a.setAttribute("href", dataStr);
-      a.setAttribute("download", `fractal_music_preset_${preset.id}.json`);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      console.log("Пресет успешно сохранён:", preset);
-    } catch (e) {
-      console.error("Ошибка при сохранении пресета:", e);
-    }
-  }
-
-
-  // Загрузка пресета
-  loadPreset(preset) {
-    this.melody.type = preset.melody.type;
-    this.melody.depth = preset.melody.depth;
-    this.melody.rules = preset.melody.rules;
-    
-    this.bass.type = preset.bass.type;
-    this.bass.depth = preset.bass.depth;
-    this.bass.rules = preset.bass.rules;
-    
-    this.drums.type = preset.drums.type;
-    this.drums.depth = preset.drums.depth;
-    this.drums.rules = preset.drums.rules;
-    
-    // Обновляем UI
-    this.elements.melodyType.value = this.melody.type;
-    this.elements.melodyDepth.value = this.melody.depth;
-    this.elements.melodyDepthValue.textContent = this.melody.depth;
-    
-    this.elements.bassType.value = this.bass.type;
-    this.elements.bassDepth.value = this.bass.depth;
-    this.elements.bassDepthValue.textContent = this.bass.depth;
-    
-    this.elements.drumsType.value = this.drums.type;
-    this.elements.drumsDepth.value = this.drums.depth;
-    this.elements.drumsDepthValue.textContent = this.drums.depth;
-    
-    this.updateAllEditors();
-    this.drawAllPreviews();
-  }
-
   // Экспорт музыки в WAV
   exportMusic() {
     // Создаем рекордер
@@ -348,17 +277,6 @@ class FractalMusicSystem {
       anchor.href = url;
       anchor.click();
     }, 8000);
-  }
-
-  // Вспомогательная функция для скачивания JSON
-  downloadObjectAsJson(exportObj, exportName) {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", exportName + ".json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
   }
 
   getDefaultRules(type) {
@@ -655,55 +573,55 @@ class FractalMusicSystem {
   
   drawDragon(ctx, canvas, rules, depth) {
     const { color, angle } = rules;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
-  
-  // Если есть аксиома и правила, используем L-систему
-  if (rules.axiom && rules.rules) {
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    this.drawLSystem(ctx, rules.axiom, rules.rules, depth, angle * Math.PI / 180, 10);
-  } else {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    
+    // Если есть аксиома и правила, используем L-систему
+    if (rules.axiom && rules.rules) {
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      this.drawLSystem(ctx, rules.axiom, rules.rules, depth, 90 * Math.PI / 180, 10);
+    } else {
 
-      // L-система
-      let axiom = "FX";
-      for (let i = 0; i < depth; i++) {
-        let next = "";
+        // L-система
+        let axiom = "FX";
+        for (let i = 0; i < depth; i++) {
+          let next = "";
+          for (let char of axiom) {
+            if (char === "X") {
+              next += "X+YF+";
+            } else if (char === "Y") {
+              next += "-FX-Y";
+            } else {
+              next += char;
+            }
+          }
+          axiom = next;
+        }
+
+        // Рисование по L-системе
+        const step = 10;
+        let x = canvas.width / 2;
+        let y = canvas.height / 2;
+        let angle = 0;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+
         for (let char of axiom) {
-          if (char === "X") {
-            next += "X+YF+";
-          } else if (char === "Y") {
-            next += "-FX-Y";
-          } else {
-            next += char;
+          if (char === "F") {
+            const rad = angle * Math.PI / 180;
+            x += step * Math.cos(rad);
+            y += step * Math.sin(rad);
+            ctx.lineTo(x, y);
+          } else if (char === "+") {
+            angle += 90;
+          } else if (char === "-") {
+            angle -= 90;
           }
         }
-        axiom = next;
+
+        ctx.stroke();
       }
-
-      // Рисование по L-системе
-      const step = 10;
-      let x = canvas.width / 2;
-      let y = canvas.height / 2;
-      let angle = 0;
-
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-
-      for (let char of axiom) {
-        if (char === "F") {
-          const rad = angle * Math.PI / 180;
-          x += step * Math.cos(rad);
-          y += step * Math.sin(rad);
-          ctx.lineTo(x, y);
-        } else if (char === "+") {
-          angle += 90;
-        } else if (char === "-") {
-          angle -= 90;
-        }
-      }
-
-      ctx.stroke();
-    }
   }
 
   
