@@ -122,99 +122,61 @@ class FractalMusicSystem {
       // Presets
       savePreset: document.getElementById('save-preset'),
       exportMusic: document.getElementById('export-music'),
-      presetsHistory: document.getElementById('presets-history')
+      presetsHistory: document.getElementById('presets-history'),
+
+      melodyAxiom: document.getElementById('melody-axiom'),
+      melodyRulesJson: document.getElementById('melody-rules-json'),
+      bassAxiom: document.getElementById('bass-axiom'),
+      bassRulesJson: document.getElementById('bass-rules-json'),
+      drumsAxiom: document.getElementById('drums-axiom'),
+      drumsRulesJson: document.getElementById('drums-rules-json'),
     };
   }
   
   setupEventListeners() {
-    // Melody controls
-    this.elements.melodyType.addEventListener('change', (e) => {
-      this.melody.type = e.target.value;
-      this.melody.rules = this.getDefaultRules(this.melody.type);
-      this.updateEditor('melody');
-      this.drawPreview('melody');
+    // Общий обработчик для всех компонентов
+    ['melody', 'bass', 'drums'].forEach(component => {
+      // Обработчик изменения типа
+      this.elements[`${component}Type`].addEventListener('change', (e) => {
+        this[component].type = e.target.value;
+        this[component].rules = this.getDefaultRules(this[component].type);
+        this.updateEditor(component);
+        this.drawPreview(component);
+      });
+      
+      // Обработчик применения изменений
+      this.elements[`${component}Apply`].addEventListener('click', () => {
+        try {
+          // Собираем все параметры
+          const newRules = {
+            ...JSON.parse(this.elements[`${component}Rules`].value),
+            axiom: this.elements[`${component}Axiom`].value,
+            rules: JSON.parse(this.elements[`${component}RulesJson`].value || '{}')
+          };
+          
+          this[component].rules = newRules;
+          this.drawPreview(component);
+        } catch (e) {
+          alert(`Ошибка в формате JSON: ${e.message}`);
+        }
+      });
+      
+      // Обработчик сброса
+      this.elements[`${component}Reset`].addEventListener('click', () => {
+        this[component].rules = this.getDefaultRules(this[component].type);
+        this.updateEditor(component);
+        this.drawPreview(component);
+      });
+      
+      // Обработчик изменения глубины
+      this.elements[`${component}Depth`].addEventListener('input', (e) => {
+        this[component].depth = parseInt(e.target.value);
+        this.elements[`${component}DepthValue`].textContent = this[component].depth;
+        this.drawPreview(component);
+      });
     });
-    
-    this.elements.melodyApply.addEventListener('click', () => {
-      try {
-        this.melody.rules = JSON.parse(this.elements.melodyRules.value);
-        this.drawPreview('melody');
-      } catch (e) {
-        alert(`Ошибка в формате JSON: ${e.message}`);
-      }
-    });
-    
-    this.elements.melodyReset.addEventListener('click', () => {
-      this.melody.rules = this.getDefaultRules(this.melody.type);
-      this.updateEditor('melody');
-      this.drawPreview('melody');
-    });
-    
-    this.elements.melodyDepth.addEventListener('input', (e) => {
-      this.melody.depth = parseInt(e.target.value);
-      this.elements.melodyDepthValue.textContent = this.melody.depth;
-      this.drawPreview('melody');
-    });
-    
-    // Bass controls
-    this.elements.bassType.addEventListener('change', (e) => {
-      this.bass.type = e.target.value;
-      this.bass.rules = this.getDefaultRules(this.bass.type);
-      this.updateEditor('bass');
-      this.drawPreview('bass');
-    });
-    
-    this.elements.bassApply.addEventListener('click', () => {
-      try {
-        this.bass.rules = JSON.parse(this.elements.bassRules.value);
-        this.drawPreview('bass');
-      } catch (e) {
-        alert(`Ошибка в формате JSON: ${e.message}`);
-      }
-    });
-    
-    this.elements.bassReset.addEventListener('click', () => {
-      this.bass.rules = this.getDefaultRules(this.bass.type);
-      this.updateEditor('bass');
-      this.drawPreview('bass');
-    });
-    
-    this.elements.bassDepth.addEventListener('input', (e) => {
-      this.bass.depth = parseInt(e.target.value);
-      this.elements.bassDepthValue.textContent = this.bass.depth;
-      this.drawPreview('bass');
-    });
-    
-    // Drums controls
-    this.elements.drumsType.addEventListener('change', (e) => {
-      this.drums.type = e.target.value;
-      this.drums.rules = this.getDefaultRules(this.drums.type);
-      this.updateEditor('drums');
-      this.drawPreview('drums');
-    });
-    
-    this.elements.drumsApply.addEventListener('click', () => {
-      try {
-        this.drums.rules = JSON.parse(this.elements.drumsRules.value);
-        this.drawPreview('drums');
-      } catch (e) {
-        alert(`Ошибка в формате JSON: ${e.message}`);
-      }
-    });
-    
-    this.elements.drumsReset.addEventListener('click', () => {
-      this.drums.rules = this.getDefaultRules(this.drums.type);
-      this.updateEditor('drums');
-      this.drawPreview('drums');
-    });
-    
-    this.elements.drumsDepth.addEventListener('input', (e) => {
-      this.drums.depth = parseInt(e.target.value);
-      this.elements.drumsDepthValue.textContent = this.drums.depth;
-      this.drawPreview('drums');
-    });
-    
-    // Playback controls
+
+    // Остальные обработчики (playback и т.д.) остаются без изменений
     this.elements.playAll.addEventListener('click', () => this.playAll());
     this.elements.stopAll.addEventListener('click', () => Tone.Transport.stop());
     this.elements.playMelody.addEventListener('click', () => this.playComponent('melody'));
@@ -225,7 +187,7 @@ class FractalMusicSystem {
         this.elements.playDrums.classList.remove('bg-green-600');
       }, 200);
       this.playComponent('drums');
-    });  
+    });
 
     this.elements.savePreset.addEventListener('click', () => this.saveCurrentPreset());
     this.elements.exportMusic.addEventListener('click', () => this.exportMusic());
@@ -406,7 +368,11 @@ class FractalMusicSystem {
         lengthFactor: 0.67,
         branches: 2,
         initLength: 80,
-        color: '#ff6b6b'
+        color: '#ff6b6b',
+        axiom: 'F',
+        rules: {
+          'F': 'FF+[+F-F-F]-[-F+F+F]'
+        }
       },
       koch: {
         segments: 4,
@@ -424,11 +390,21 @@ class FractalMusicSystem {
       dragon: {
         color: '#feca57',
         angle: 45,
-        scaleFactor: 0.7
+        scaleFactor: 0.7,
+        axiom: 'FX',
+        rules: {
+          'X': 'X+YF+',
+          'Y': '-FX-Y'
+        }
       },
       barnsley: {
         color: '#5f27cd',
-        points: 10000
+        points: 10000,
+        axiom: 'X',
+        rules: {
+          'X': 'F+[[X]-X]-F[-FX]+X',
+          'F': 'FF'
+        }
       }
     };
     
@@ -442,8 +418,23 @@ class FractalMusicSystem {
   }
   
   updateEditor(component) {
-    this.elements[`${component}Rules`].value = JSON.stringify(this[component].rules, null, 2);
+    const componentData = this[component];
+
+    if (this.elements[`${component}Rules`]) {
+      this.elements[`${component}Rules`].value = JSON.stringify(componentData.rules, null, 2);
+    }
+
+    if (this.elements[`${component}Axiom`] && componentData.rules.axiom !== undefined) {
+      this.elements[`${component}Axiom`].value = componentData.rules.axiom;
+    }
+
+    if (this.elements[`${component}RulesJson`] && componentData.rules.rules) {
+      this.elements[`${component}RulesJson`].value = JSON.stringify(componentData.rules.rules, null, 2);
+    } else if (this.elements[`${component}RulesJson`]) {
+      this.elements[`${component}RulesJson`].value = '';
+    }
   }
+
   
   drawAllPreviews() {
     this.drawPreview('melody');
@@ -485,14 +476,70 @@ class FractalMusicSystem {
     ctx.lineWidth = 2;
     ctx.translate(canvas.width / 2, canvas.height);
     
-    this.drawBranch(
-      ctx,
-      rules.initLength || 80,
-      depth,
-      rules.angle * Math.PI / 180,
-      rules.lengthFactor || 0.67,
-      rules.branches || 2
-    );
+    // Если есть аксиома и правила, используем L-систему
+    if (rules.axiom && rules.rules) {
+      this.drawLSystem(ctx, rules.axiom, rules.rules, depth, rules.angle * Math.PI / 180, rules.initLength || 80);
+    } else {
+      // Старый вариант для обратной совместимости
+      this.drawBranch(
+        ctx,
+        rules.initLength || 80,
+        depth,
+        rules.angle * Math.PI / 180,
+        rules.lengthFactor || 0.67,
+        rules.branches || 2
+      );
+    }
+  }
+
+  drawLSystem(ctx, axiom, rules, depth, angle, length) {
+    // Генерация строки по правилам L-системы
+    let currentString = axiom;
+    
+    for (let i = 0; i < depth; i++) {
+      let nextString = '';
+      for (const char of currentString) {
+        nextString += rules[char] || char;
+      }
+      currentString = nextString;
+    }
+    
+    // Рисование
+    const stack = [];
+    let x = 0, y = 0;
+    let currentAngle = -Math.PI / 2; // Начинаем рисовать вверх
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    
+    for (const char of currentString) {
+      switch(char) {
+        case 'F':
+          x += length * Math.cos(currentAngle);
+          y += length * Math.sin(currentAngle);
+          ctx.lineTo(x, y);
+          break;
+        case '+':
+          currentAngle += angle;
+          break;
+        case '-':
+          currentAngle -= angle;
+          break;
+        case '[':
+          stack.push({ x, y, angle: currentAngle });
+          break;
+        case ']':
+          const state = stack.pop();
+          x = state.x;
+          y = state.y;
+          currentAngle = state.angle;
+          ctx.moveTo(x, y);
+          break;
+        // Другие символы игнорируем
+      }
+    }
+    
+    ctx.stroke();
   }
   
   drawBranch(ctx, length, depth, angle, lengthFactor, branches) {
@@ -607,78 +654,92 @@ class FractalMusicSystem {
   }
   
   drawDragon(ctx, canvas, rules, depth) {
-    const { color } = rules;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
+    const { color, angle } = rules;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  
+  // Если есть аксиома и правила, используем L-систему
+  if (rules.axiom && rules.rules) {
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    this.drawLSystem(ctx, rules.axiom, rules.rules, depth, angle * Math.PI / 180, 10);
+  } else {
 
-    // L-система
-    let axiom = "FX";
-    for (let i = 0; i < depth; i++) {
-      let next = "";
+      // L-система
+      let axiom = "FX";
+      for (let i = 0; i < depth; i++) {
+        let next = "";
+        for (let char of axiom) {
+          if (char === "X") {
+            next += "X+YF+";
+          } else if (char === "Y") {
+            next += "-FX-Y";
+          } else {
+            next += char;
+          }
+        }
+        axiom = next;
+      }
+
+      // Рисование по L-системе
+      const step = 10;
+      let x = canvas.width / 2;
+      let y = canvas.height / 2;
+      let angle = 0;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+
       for (let char of axiom) {
-        if (char === "X") {
-          next += "X+YF+";
-        } else if (char === "Y") {
-          next += "-FX-Y";
-        } else {
-          next += char;
+        if (char === "F") {
+          const rad = angle * Math.PI / 180;
+          x += step * Math.cos(rad);
+          y += step * Math.sin(rad);
+          ctx.lineTo(x, y);
+        } else if (char === "+") {
+          angle += 90;
+        } else if (char === "-") {
+          angle -= 90;
         }
       }
-      axiom = next;
+
+      ctx.stroke();
     }
-
-    // Рисование по L-системе
-    const step = 10;
-    let x = canvas.width / 2;
-    let y = canvas.height / 2;
-    let angle = 0;
-
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-
-    for (let char of axiom) {
-      if (char === "F") {
-        const rad = angle * Math.PI / 180;
-        x += step * Math.cos(rad);
-        y += step * Math.sin(rad);
-        ctx.lineTo(x, y);
-      } else if (char === "+") {
-        angle += 90;
-      } else if (char === "-") {
-        angle -= 90;
-      }
-    }
-
-    ctx.stroke();
   }
 
   
   drawBarnsleyFern(ctx, canvas, rules) {
-    const { color, points } = rules;
-    ctx.fillStyle = color;
-    let x = 0, y = 0;
+    if (rules.axiom && rules.rules) {
+      // Режим L-системы
+      ctx.translate(canvas.width / 2, canvas.height);
+      this.drawLSystem(ctx, rules.axiom, rules.rules, rules.depth || 5, 25 * Math.PI / 180, 5);
+    } else {
+      // Оригинальный алгоритм Барнсли
+      const { color, points } = rules;
+      ctx.fillStyle = color;
+      let x = 0, y = 0;
 
-    for (let i = 0; i < points; i++) {
-      const r = Math.random();
-      let nextX, nextY;
-      if (r < 0.01) {
-        nextX = 0;
-        nextY = 0.16 * y;
-      } else if (r < 0.86) {
-        nextX = 0.85 * x + 0.04 * y;
-        nextY = -0.04 * x + 0.85 * y + 1.6;
-      } else if (r < 0.93) {
-        nextX = 0.2 * x - 0.26 * y;
-        nextY = 0.23 * x + 0.22 * y + 1.6;
-      } else {
-        nextX = -0.15 * x + 0.28 * y;
-        nextY = 0.26 * x + 0.24 * y + 0.44;
+      for (let i = 0; i < points; i++) {
+        const r = Math.random();
+        let nextX, nextY;
+        if (r < 0.01) {
+          nextX = 0;
+          nextY = 0.16 * y;
+        } else if (r < 0.86) {
+          nextX = 0.85 * x + 0.04 * y;
+          nextY = -0.04 * x + 0.85 * y + 1.6;
+        } else if (r < 0.93) {
+          nextX = 0.2 * x - 0.26 * y;
+          nextY = 0.23 * x + 0.22 * y + 1.6;
+        } else {
+          nextX = -0.15 * x + 0.28 * y;
+          nextY = 0.26 * x + 0.24 * y + 0.44;
+        }
+        x = nextX;
+        y = nextY;
+        const plotX = canvas.width / 2 + x * 30;
+        const plotY = canvas.height - y * 30;
+        ctx.fillRect(plotX, plotY, 1, 1);
       }
-      x = nextX;
-      y = nextY;
-      const plotX = canvas.width / 2 + x * 30;
-      const plotY = canvas.height - y * 30;
-      ctx.fillRect(plotX, plotY, 1, 1);
     }
   }
   
