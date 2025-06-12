@@ -293,11 +293,13 @@ class FractalMusicSystem {
         }
       },
       koch: {
-        segments: 4,
         angle: 60,
-        scaleFactor: 1/3,
-        color: '#48dbfb'
-      },
+        color: '#48dbfb',
+        axiom: 'F--F--F', // Треугольник
+        rules: {
+          'F': 'F+F--F+F' // Правило для снежинки Коха
+        }
+    },
       mandelbrot: {
         maxIterations: 100,
         zoom: 1,
@@ -482,33 +484,41 @@ class FractalMusicSystem {
   drawKoch(ctx, canvas, rules, depth) {
     ctx.strokeStyle = rules.color || '#48dbfb';
     ctx.lineWidth = 1;
+    
+    // Если есть аксиома и правила, используем L-систему
+    if (rules.axiom && rules.rules) {
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(0.8, 0.8); // Масштабируем, чтобы поместилось на холсте
+      this.drawLSystem(ctx, rules.axiom, rules.rules, depth, rules.angle * Math.PI / 180, 5);
+    } else {
+      // Старый вариант для обратной совместимости
+      const sideLength = Math.min(canvas.width, canvas.height) * 0.6;
+      const height = sideLength * Math.sqrt(3) / 2;
 
-    const sideLength = Math.min(canvas.width, canvas.height) * 0.6;
-    const height = sideLength * Math.sqrt(3) / 2;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
 
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+      const angleDeg = rules.angle || 60;
+      const angleRad = angleDeg * Math.PI / 180;
+      const scaleFactor = rules.scaleFactor || 1 / 3;
 
-    const angleDeg = rules.angle || 60;
-    const angleRad = angleDeg * Math.PI / 180;
-    const scaleFactor = rules.scaleFactor || 1 / 3;
+      const p1 = {
+        x: centerX,
+        y: centerY - (2 / 3) * height
+      };
+      const p2 = {
+        x: centerX - sideLength / 2,
+        y: centerY + (1 / 3) * height
+      };
+      const p3 = {
+        x: centerX + sideLength / 2,
+        y: centerY + (1 / 3) * height
+      };
 
-    const p1 = {
-      x: centerX,
-      y: centerY - (2 / 3) * height
-    };
-    const p2 = {
-      x: centerX - sideLength / 2,
-      y: centerY + (1 / 3) * height
-    };
-    const p3 = {
-      x: centerX + sideLength / 2,
-      y: centerY + (1 / 3) * height
-    };
-
-    this.drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor);
-    this.drawKochSide(ctx, p2, p3, depth, angleRad, scaleFactor);
-    this.drawKochSide(ctx, p3, p1, depth, angleRad, scaleFactor);
+      this.drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor);
+      this.drawKochSide(ctx, p2, p3, depth, angleRad, scaleFactor);
+      this.drawKochSide(ctx, p3, p1, depth, angleRad, scaleFactor);
+    }
   }
 
   drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor) {
