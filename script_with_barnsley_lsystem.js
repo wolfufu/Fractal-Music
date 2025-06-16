@@ -1,3 +1,4 @@
+import { generateLSystem } from './axioms.js';
 let compositionId = null;
 
 class FractalMusicSystem {
@@ -727,19 +728,88 @@ class FractalMusicSystem {
     ctx.stroke();
   }
 
-  
   drawBarnsleyFern(ctx, canvas, rules) {
-    const { color, points } = rules;
-    ctx.fillStyle = color;
-    let x = 0, y = 0;
+    ctx.fillStyle = rules.color || "#5f27cd";
 
-    for (let i = 0; i < points; i++) {
-      const r = Math.random();
-      let nextX, nextY;
-      if (r < 0.01) {
-        nextX = 0;
-        nextY = 0.16 * y;
-      } else if (r < 0.86) {
+    if (rules.axiom && rules.rules) {
+      const lSystem = generateLSystem({
+        axiom: rules.axiom,
+        rules: rules.rules,
+        depth: 5
+      });
+
+      let x = 0, y = 0, angle = 0;
+      const stack = [];
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height);
+      ctx.scale(1, -1);
+
+      for (let char of lSystem) {
+        switch (char) {
+          case "F":
+            const newX = x + Math.cos(angle * Math.PI / 180) * 2;
+            const newY = y + Math.sin(angle * Math.PI / 180) * 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(newX, newY);
+            ctx.strokeStyle = rules.color || "#5f27cd";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            x = newX;
+            y = newY;
+            break;
+          case "+":
+            angle += rules.angle || 25;
+            break;
+          case "-":
+            angle -= rules.angle || 25;
+            break;
+          case "[":
+            stack.push({ x, y, angle });
+            break;
+          case "]":
+            const state = stack.pop();
+            x = state.x;
+            y = state.y;
+            angle = state.angle;
+            break;
+        }
+      }
+      ctx.restore();
+    } else {
+      let x = 0, y = 0;
+      const probs = rules.probabilities || [0.01, 0.85, 0.07, 0.07];
+      const points = rules.points || 10000;
+
+      for (let i = 0; i < points; i++) {
+        const r = Math.random();
+        let nextX, nextY;
+
+        if (r < probs[0]) {
+          nextX = 0;
+          nextY = 0.16 * y;
+        } else if (r < probs[0] + probs[1]) {
+          nextX = 0.85 * x + 0.04 * y;
+          nextY = -0.04 * x + 0.85 * y + 1.6;
+        } else if (r < probs[0] + probs[1] + probs[2]) {
+          nextX = 0.2 * x - 0.26 * y;
+          nextY = 0.23 * x + 0.22 * y + 1.6;
+        } else {
+          nextX = -0.15 * x + 0.28 * y;
+          nextY = 0.26 * x + 0.24 * y + 0.44;
+        }
+
+        x = nextX;
+        y = nextY;
+        const plotX = canvas.width / 2 + x * 30;
+        const plotY = canvas.height - y * 30;
+        ctx.fillRect(plotX, plotY, 1, 1);
+      }
+    }
+  }
+
+export { drawBarnsleyFern }; else if (r < 0.86) {
         nextX = 0.85 * x + 0.04 * y;
         nextY = -0.04 * x + 0.85 * y + 1.6;
       } else if (r < 0.93) {

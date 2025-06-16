@@ -20,24 +20,19 @@
           <option value="koch">Снежинка Коха</option>
           <option value="mandelbrot">Мандельброт</option>
         </select>
+        <div class="mb-4">
+          <label class="inline-flex items-center">
+            <input type="checkbox" id="melody-toggle-mode" class="form-checkbox text-blue-600 mr-2">
+            <span>Режим аксиом</span>
+          </label>
+        </div>
         <canvas id="melody-canvas" width="300" height="300" class="w-full bg-gray-900 rounded mb-4"></canvas>
         <div class="mb-4">
           <label class="block mb-1">Глубина:</label>
           <input type="range" id="melody-depth" min="1" max="8" value="3" class="w-full">
           <div class="text-center text-sm" id="melody-depth-value">3</div>
         </div>
-        
-        <!-- Новые поля для аксиом и правил -->
-        <div class="mb-2">
-          <label class="block mb-1">Аксиома:</label>
-          <input type="text" id="melody-axiom" class="w-full bg-gray-700 text-white p-2 rounded">
-        </div>
-        <div class="mb-2">
-          <label class="block mb-1">Правила (JSON):</label>
-          <textarea id="melody-rules-json" class="w-full h-20 bg-gray-700 text-white p-2 rounded font-mono text-sm"></textarea>
-        </div>
-        
-        <textarea id="melody-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2 hidden"></textarea>
+        <textarea id="melody-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2"></textarea>
         <button id="melody-apply" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded w-full mb-2">
           Применить
         </button>
@@ -54,24 +49,19 @@
           <option value="tree">Дерево</option>
           <option value="koch">Снежинка Коха</option>
         </select>
+        <div class="mb-4">
+          <label class="inline-flex items-center">
+            <input type="checkbox" id="bass-toggle-mode" class="form-checkbox text-blue-600 mr-2">
+            <span>Режим аксиом</span>
+          </label>
+        </div>
         <canvas id="bass-canvas" width="300" height="300" class="w-full bg-gray-900 rounded mb-4"></canvas>
         <div class="mb-4">
           <label class="block mb-1">Глубина:</label>
           <input type="range" id="bass-depth" min="1" max="8" value="3" class="w-full">
           <div class="text-center text-sm" id="bass-depth-value">3</div>
         </div>
-        
-        <!-- Новые поля для аксиом и правил -->
-        <div class="mb-2">
-          <label class="block mb-1">Аксиома:</label>
-          <input type="text" id="bass-axiom" class="w-full bg-gray-700 text-white p-2 rounded">
-        </div>
-        <div class="mb-2">
-          <label class="block mb-1">Правила (JSON):</label>
-          <textarea id="bass-rules-json" class="w-full h-20 bg-gray-700 text-white p-2 rounded font-mono text-sm"></textarea>
-        </div>
-        
-        <textarea id="bass-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2 hidden"></textarea>
+        <textarea id="bass-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2"></textarea>
         <button id="bass-apply" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded w-full mb-2">
           Применить
         </button>
@@ -88,24 +78,19 @@
           <option value="mandelbrot">Мандельброт</option>
           <option value="dragon">Дракон</option>
         </select>
+        <div class="mb-4">
+          <label class="inline-flex items-center">
+            <input type="checkbox" id="drums-toggle-mode" class="form-checkbox text-blue-600 mr-2">
+            <span>Режим аксиом</span>
+          </label>
+        </div>
         <canvas id="drums-canvas" width="300" height="300" class="w-full bg-gray-900 rounded mb-4"></canvas>
         <div class="mb-4">
           <label class="block mb-1">Глубина:</label>
           <input type="range" id="drums-depth" min="1" max="8" value="3" class="w-full">
           <div class="text-center text-sm" id="drums-depth-value">3</div>
         </div>
-        
-        <!-- Новые поля для аксиом и правил -->
-        <div class="mb-2">
-          <label class="block mb-1">Аксиома:</label>
-          <input type="text" id="drums-axiom" class="w-full bg-gray-700 text-white p-2 rounded">
-        </div>
-        <div class="mb-2">
-          <label class="block mb-1">Правила (JSON):</label>
-          <textarea id="drums-rules-json" class="w-full h-20 bg-gray-700 text-white p-2 rounded font-mono text-sm"></textarea>
-        </div>
-        
-        <textarea id="drums-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2 hidden"></textarea>
+        <textarea id="drums-rules" class="w-full h-32 bg-gray-700 text-white p-3 rounded font-mono text-sm mb-2"></textarea>
         <button id="drums-apply" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded w-full mb-2">
           Применить
         </button>
@@ -115,13 +100,16 @@
       </div>
     </div>
 
-    <!-- Остальная часть HTML остается без изменений -->
     <div class="mt-6 bg-gray-800 p-6 rounded-lg">
       <h2 class="text-xl font-semibold mb-4">Визуализация музыки</h2>
-      <div class="grid grid-cols-1 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h3 class="text-lg mb-2">Осциллограф</h3>
-          <canvas id="oscilloscope" width="800" height="400" class="w-full bg-black rounded"></canvas>
+          <canvas id="oscilloscope" width="400" height="200" class="w-full bg-black rounded"></canvas>
+        </div>
+        <div>
+          <h3 class="text-lg mb-2">Круговая визуализация</h3>
+          <canvas id="circle-visualizer" width="400" height="200" class="w-full bg-black rounded"></canvas>
         </div>
       </div>
     </div>
@@ -130,10 +118,10 @@
       <h2 class="text-xl font-semibold mb-4">Управление воспроизведением</h2>
       <div class="flex space-x-4">
         <button id="play-all" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg text-lg flex-1">
-          Проиграть все
+          ▶️ Проиграть все
         </button>
         <button id="stop-all" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg text-lg flex-1">
-          Остановить
+          ⏹ Остановить
         </button>
       </div>
       <div class="mt-4 grid grid-cols-3 gap-4">
@@ -147,7 +135,10 @@
           Проиграть ударные
         </button>
       </div>
-      <div class="mt-4 grid grid-cols-1 gap-4">
+      <div class="mt-4 grid grid-cols-2 gap-4">
+        <button id="save-preset" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded">
+          Сохранить пресет
+        </button>
         <button id="export-music" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
           Экспорт музыки
         </button>
@@ -181,7 +172,9 @@
         <p class="text-sm text-gray-400">Загрузка избранных...</p>
       </div>
     </div>
+    </div>
   </div>
+  <script type="module" src="/static/init-fractal.js"></script>
   <script src="/static/script.js"></script>
 </body>
 </html>
