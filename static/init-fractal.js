@@ -4,6 +4,7 @@ import { getAxiomDefaults, generateLSystem } from './axioms.js';
 function setupToggle(component) {
   const toggle = document.getElementById(`${component}-toggle-mode`);
   const rulesArea = document.getElementById(`${component}-rules`);
+  toggle.checked = false;
 
   toggle.addEventListener("change", () => {
     if (toggle.checked) {
@@ -14,8 +15,10 @@ function setupToggle(component) {
         return;
       }
       rulesArea.value = JSON.stringify({
+        ...window.fractalSystem.getDefaultRules(type), // Сохраняем текущие настройки
+        useLSystem: true, // Включаем режим L-системы
         axiom: axiomDefaults.axiom,
-        rules: axiomDefaults.rules,
+        lsystemRules: axiomDefaults.rules,
         angle: axiomDefaults.angle
       }, null, 2);
     } else {
@@ -23,7 +26,10 @@ function setupToggle(component) {
         const defaultRules = window.fractalSystem.getDefaultRules(
           window.fractalSystem[component].type
         );
-        rulesArea.value = JSON.stringify(defaultRules, null, 2);
+        rulesArea.value = JSON.stringify({
+          ...defaultRules,
+          useLSystem: false // Отключаем режим L-системы
+        }, null, 2);
       }
     }
   });

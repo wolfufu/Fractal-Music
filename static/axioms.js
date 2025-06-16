@@ -1,4 +1,3 @@
-
 export function getAxiomDefaults(type) {
   const presets = {
     dragon: {
@@ -14,6 +13,14 @@ export function getAxiomDefaults(type) {
     tree: {
       axiom: "F",
       rules: { "F": "F[+F]F[-F]F" },
+      angle: 25
+    },
+    barnsley: { 
+      axiom: "X",
+      rules: { 
+        "X": "F+[[X]-X]-F[-FX]+X",
+        "F": "FF" 
+      },
       angle: 25
     }
   };

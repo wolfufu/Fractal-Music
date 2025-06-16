@@ -502,8 +502,16 @@ class FractalMusicSystem {
         scaleFactor: 0.7
       },
       barnsley: {
-        color: '#5f27cd',
-        points: 10000
+        color: "#5f27cd",
+        points: 10000,
+        useLSystem: false,  // По умолчанию включен режим L-системы
+        axiom: "X",
+        lsystemRules: {
+          "X": "F+[[X]-X]-F[-FX]+X",
+          "F": "FF"
+        },
+        angle: 25,         // Угол поворота ветвей
+        initLength: 10     // Длина сегмента
       }
     };
     
@@ -545,7 +553,7 @@ class FractalMusicSystem {
         this.drawDragon(ctx, canvas, rules, depth);
         break;
       case 'barnsley':
-        this.drawBarnsleyFern(ctx, canvas, rules);
+        this.drawBarnsleyFern(ctx, canvas, rules, depth); 
         break;
       default:
         console.warn(`Unknown fractal type: ${type}`);
@@ -727,33 +735,95 @@ class FractalMusicSystem {
     ctx.stroke();
   }
 
-  
-  drawBarnsleyFern(ctx, canvas, rules) {
-    const { color, points } = rules;
-    ctx.fillStyle = color;
-    let x = 0, y = 0;
-
-    for (let i = 0; i < points; i++) {
-      const r = Math.random();
-      let nextX, nextY;
-      if (r < 0.01) {
-        nextX = 0;
-        nextY = 0.16 * y;
-      } else if (r < 0.86) {
-        nextX = 0.85 * x + 0.04 * y;
-        nextY = -0.04 * x + 0.85 * y + 1.6;
-      } else if (r < 0.93) {
-        nextX = 0.2 * x - 0.26 * y;
-        nextY = 0.23 * x + 0.22 * y + 1.6;
-      } else {
-        nextX = -0.15 * x + 0.28 * y;
-        nextY = 0.26 * x + 0.24 * y + 0.44;
+  drawBarnsleyFern(ctx, canvas, rules, depth) {
+    if (rules.useLSystem) {
+      // Режим L-системы
+      const { color, angle = 25 } = rules;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      
+      // Генерируем L-систему
+      let currentAxiom = rules.axiom || "X";
+      const rulesToUse = rules.lsystemRules || {
+        "X": "F+[[X]-X]-F[-FX]+X",
+        "F": "FF"
+      };
+      
+      for (let i = 0; i < depth; i++) {
+        let next = "";
+        for (let char of currentAxiom) {
+          next += rulesToUse[char] || char;
+        }
+        currentAxiom = next;
       }
-      x = nextX;
-      y = nextY;
-      const plotX = canvas.width / 2 + x * 30;
-      const plotY = canvas.height - y * 30;
-      ctx.fillRect(plotX, plotY, 1, 1);
+      
+      // Рисуем L-систему с правильной ориентацией
+      const step = 5;
+      let x = canvas.width / 2;
+      let y = canvas.height * 0.9;  // Начальная позиция снизу
+      let angleRad = -Math.PI / 2;  // Начальный угол: вверх (90 градусов)
+      let stack = [];
+      
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      
+      for (let char of currentAxiom) {
+        switch(char) {
+          case 'F':
+            const newX = x + step * Math.cos(angleRad);
+            const newY = y + step * Math.sin(angleRad);
+            ctx.lineTo(newX, newY);
+            x = newX;
+            y = newY;
+            break;
+          case '+':
+            angleRad += angle * Math.PI / 180;  // Поворот против часовой
+            break;
+          case '-':
+            angleRad -= angle * Math.PI / 180;  // Поворот по часовой
+            break;
+          case '[':
+            stack.push({ x, y, angleRad });
+            break;
+          case ']':
+            const state = stack.pop();
+            x = state.x;
+            y = state.y;
+            angleRad = state.angleRad;
+            ctx.moveTo(x, y);
+            break;
+        }
+      }
+      
+      ctx.stroke();
+    } else {
+      // Оригинальный стохастический режим
+      const { color, points } = rules;
+      ctx.fillStyle = color;
+      let x = 0, y = 0;
+
+      for (let i = 0; i < points; i++) {
+        const r = Math.random();
+        let nextX, nextY;
+        if (r < 0.01) {
+          nextX = 0;
+          nextY = 0.16 * y;
+        } else if (r < 0.86) {
+          nextX = 0.85 * x + 0.04 * y;
+          nextY = -0.04 * x + 0.85 * y + 1.6;
+        } else if (r < 0.93) {
+          nextX = 0.2 * x - 0.26 * y;
+          nextY = 0.23 * x + 0.22 * y + 1.6;
+        } else {
+          nextX = -0.15 * x + 0.28 * y;
+          nextY = 0.26 * x + 0.24 * y + 0.44;
+        }
+        x = nextX;
+        y = nextY;
+        const plotX = canvas.width / 2 + x * 30;
+        const plotY = canvas.height - y * 30;
+        ctx.fillRect(plotX, plotY, 1, 1);
+      }
     }
   }
   

@@ -63,7 +63,6 @@ def login():
         return render_template("login.html", error="Неверный email или пароль")
     return render_template("login.html")
 
-
 @app.route("/logout")
 def logout():
     session.pop("session_id", None)
