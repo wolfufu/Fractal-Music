@@ -502,21 +502,25 @@ class FractalMusicSystem {
         scaleFactor: 0.7
       },
       barnsley: {
-        color: "#5f27cd",
-        points: 10000,
-        useLSystem: false,  // По умолчанию включен режим L-системы
-        axiom: "X",
-        lsystemRules: {
-          "X": "F+[[X]-X]-F[-FX]+X",
-          "F": "FF"
-        },
-        angle: 25,         // Угол поворота ветвей
-        initLength: 10     // Длина сегмента
-      }
-    };
-    
-    return defaults[type];
-  }
+      color: "#5f27cd",
+      points: 10000,
+      useLSystem: false,
+      axiom: "X",
+      lsystemRules: {
+        "X": [
+          {rule: "F+[[X]-X]-F[-FX]+X", probability: 0.5},
+          {rule: "FF", probability: 0.3},
+          {rule: "F[+X][-X]", probability: 0.2}
+        ],
+        "F": "FF"
+      },
+      angle: 25,
+      initLength: 10
+    }
+  };
+  
+  return defaults[type];
+}
   
   updateAllEditors() {
     this.updateEditor('melody');
@@ -737,31 +741,53 @@ class FractalMusicSystem {
 
   drawBarnsleyFern(ctx, canvas, rules, depth) {
     if (rules.useLSystem) {
-      // Режим L-системы
+      // Режим L-системы с вероятностями
       const { color, angle = 25 } = rules;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       
-      // Генерируем L-систему
+      // Генерируем L-систему с учетом вероятностей
       let currentAxiom = rules.axiom || "X";
       const rulesToUse = rules.lsystemRules || {
-        "X": "F+[[X]-X]-F[-FX]+X",
+        "X": [
+          {rule: "F+[[X]-X]-F[-FX]+X", probability: 0.5},
+          {rule: "FF", probability: 0.3},
+          {rule: "F[+X][-X]", probability: 0.2}
+        ],
         "F": "FF"
       };
       
       for (let i = 0; i < depth; i++) {
         let next = "";
         for (let char of currentAxiom) {
-          next += rulesToUse[char] || char;
+          if (rulesToUse[char]) {
+            if (Array.isArray(rulesToUse[char])) {
+              // Обработка правил с вероятностями
+              const rand = Math.random();
+              let cumulativeProb = 0;
+              for (const rule of rulesToUse[char]) {
+                cumulativeProb += rule.probability;
+                if (rand <= cumulativeProb) {
+                  next += rule.rule;
+                  break;
+                }
+              }
+            } else {
+              // Стандартная обработка для других правил
+              next += rulesToUse[char];
+            }
+          } else {
+            next += char;
+          }
         }
         currentAxiom = next;
       }
       
-      // Рисуем L-систему с правильной ориентацией
-      const step = 5;
+      // Рисуем L-систему
+      const step = rules.initLength || 5;
       let x = canvas.width / 2;
-      let y = canvas.height * 0.9;  // Начальная позиция снизу
-      let angleRad = -Math.PI / 2;  // Начальный угол: вверх (90 градусов)
+      let y = canvas.height * 0.9;
+      let angleRad = -Math.PI / 2;
       let stack = [];
       
       ctx.beginPath();
@@ -777,10 +803,10 @@ class FractalMusicSystem {
             y = newY;
             break;
           case '+':
-            angleRad += angle * Math.PI / 180;  // Поворот против часовой
+            angleRad += angle * Math.PI / 180;
             break;
           case '-':
-            angleRad -= angle * Math.PI / 180;  // Поворот по часовой
+            angleRad -= angle * Math.PI / 180;
             break;
           case '[':
             stack.push({ x, y, angleRad });
@@ -797,7 +823,7 @@ class FractalMusicSystem {
       
       ctx.stroke();
     } else {
-      // Оригинальный стохастический режим
+      // Оригинальный стохастический режим IFS
       const { color, points } = rules;
       ctx.fillStyle = color;
       let x = 0, y = 0;
