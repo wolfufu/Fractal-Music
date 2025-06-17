@@ -2,9 +2,6 @@ let compositionId = null;
 
 class FractalMusicSystem {
   constructor() {
-    this.presetsHistory = [];
-    this.currentPresetId = 0;
-
     // Инициализация компонентов
     this.melody = {
       type: 'tree',
@@ -125,9 +122,7 @@ class FractalMusicSystem {
       playDrums: document.getElementById('play-drums'),
 
       // Presets
-      savePreset: document.getElementById('save-preset'),
       exportMusic: document.getElementById('export-music'),
-      presetsHistory: document.getElementById('presets-history')
     };
   }
   
@@ -232,7 +227,6 @@ class FractalMusicSystem {
       this.playComponent('drums');
     });  
 
-    this.elements.savePreset.addEventListener('click', () => this.saveCurrentPreset());
     this.elements.exportMusic.addEventListener('click', () => this.exportMusic());
   }
 
