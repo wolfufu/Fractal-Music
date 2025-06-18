@@ -1,3 +1,4 @@
+import { getAxiomDefaults, generateLSystem } from './axioms.js';
 let compositionId = null;
 
 class FractalMusicSystem {
@@ -471,6 +472,7 @@ class FractalMusicSystem {
   getDefaultRules(type) {
     const defaults = {
       tree: {
+        useLSystem: false,
         angle: 45,
         lengthFactor: 0.67,
         branches: 2,
@@ -478,6 +480,7 @@ class FractalMusicSystem {
         color: '#ff6b6b'
       },
       koch: {
+        useLSystem: false,
         segments: 4,
         angle: 60,
         scaleFactor: 1/3,
@@ -491,26 +494,27 @@ class FractalMusicSystem {
         color: '#1dd1a1'
       },
       dragon: {
+        useLSystem: false,
         color: '#feca57',
         angle: 45,
         scaleFactor: 0.7
       },
       barnsley: {
-      color: "#5f27cd",
-      points: 10000,
-      useLSystem: false,
-      axiom: "X",
-      lsystemRules: {
-        "X": [
-          {rule: "F+[[X]-X]-F[-FX]+X", probability: 0.5},
-          {rule: "FF", probability: 0.3},
-          {rule: "F[+X][-X]", probability: 0.2}
-        ],
-        "F": "FF"
-      },
-      angle: 25,
-      initLength: 10
-    }
+        color: "#5f27cd",
+        points: 10000,
+        useLSystem: false,
+        axiom: "X",
+        lsystemRules: {
+          "X": [
+            {rule: "F+[[X]-X]-F[-FX]+X", probability: 0.5},
+            {rule: "FF", probability: 0.3},
+            {rule: "F[+X][-X]", probability: 0.2}
+          ],
+          "F": "FF"
+        },
+        angle: 25,
+        initLength: 10
+      }
   };
   
   return defaults[type];
@@ -531,30 +535,87 @@ class FractalMusicSystem {
     this.drawPreview('bass');
     this.drawPreview('drums');
   }
+
+  drawLSystem(ctx, canvas, lsystem, angle, step) {
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    
+    let x = canvas.width / 2;
+    let y = canvas.height / 2;
+    let currentAngle = -Math.PI / 2; // Начинаем с направления вверх
+    let stack = [];
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    
+    for (let char of lsystem) {
+      switch(char) {
+        case 'F':
+          const newX = x + step * Math.cos(currentAngle);
+          const newY = y + step * Math.sin(currentAngle);
+          ctx.lineTo(newX, newY);
+          x = newX;
+          y = newY;
+          break;
+        case '+':
+          currentAngle += angle * Math.PI / 180;
+          break;
+        case '-':
+          currentAngle -= angle * Math.PI / 180;
+          break;
+        case '[':
+          stack.push({ x, y, angle: currentAngle });
+          break;
+        case ']':
+          const state = stack.pop();
+          x = state.x;
+          y = state.y;
+          currentAngle = state.angle;
+          ctx.moveTo(x, y);
+          break;
+      }
+    }
+    
+    ctx.stroke();
+  }
   
   drawPreview(component) {
     const { ctx, canvas, type, rules, depth } = this[component];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     
-    switch(type) {
-      case 'tree':
-        this.drawTree(ctx, canvas, rules, depth);
-        break;
-      case 'koch':
-        this.drawKoch(ctx, canvas, rules, depth);
-        break;
-      case 'mandelbrot':
-        this.drawMandelbrot(ctx, canvas, rules);
-        break;
-      case 'dragon':
-        this.drawDragon(ctx, canvas, rules, depth);
-        break;
-      case 'barnsley':
-        this.drawBarnsleyFern(ctx, canvas, rules, depth); 
-        break;
-      default:
-        console.warn(`Unknown fractal type: ${type}`);
+    // Для всех фракталов проверяем useLSystem
+    if (rules.useLSystem) {
+      const axiomDefaults = getAxiomDefaults(type);
+      if (axiomDefaults) {
+        const lsystem = generateLSystem({
+          axiom: rules.axiom || axiomDefaults.axiom,
+          rules: rules.lsystemRules || axiomDefaults.rules,
+          depth: depth
+        });
+        this.drawLSystem(ctx, canvas, lsystem, rules.angle || axiomDefaults.angle, rules.initLength || 10);
+      }
+    } else {
+      // Оригинальные методы отрисовки
+      switch(type) {
+        case 'tree':
+          this.drawTree(ctx, canvas, rules, depth);
+          break;
+        case 'koch':
+          this.drawKoch(ctx, canvas, rules, depth);
+          break;
+        case 'mandelbrot':
+          this.drawMandelbrot(ctx, canvas, rules);
+          break;
+        case 'dragon':
+          this.drawDragon(ctx, canvas, rules, depth);
+          break;
+        case 'barnsley':
+          this.drawBarnsleyFern(ctx, canvas, rules, depth); 
+          break;
+        default:
+          console.warn(`Unknown fractal type: ${type}`);
+      }
     }
     
     ctx.restore();

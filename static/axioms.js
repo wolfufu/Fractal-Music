@@ -25,6 +25,11 @@ export function getAxiomDefaults(type) {
         ]
       },
       angle: 25
+    },
+    mandelbrot: {
+      axiom: "F",
+      rules: { "F": "F+F-F-F+F" },
+      angle: 90
     }
   };
   return presets[type] || null;
