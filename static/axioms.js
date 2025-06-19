@@ -39,7 +39,7 @@ export function getAxiomDefaults(type) {
       angle: 22.5
     },
     branching_tree: {
-      axiom: "F",
+      axiom: "X",
       rules: {
         "X": "F[+X][-X]FX",
         "F": "FF"

@@ -534,7 +534,7 @@ class FractalMusicSystem {
         angle: 22.5,
         initLength: 70,
         useLSystem: true,
-        axiom: "F",
+        axiom: "X",
         lsystemRules: {
           "X": "F[+X][-X]FX",
           "F": "FF"
@@ -706,61 +706,103 @@ class FractalMusicSystem {
       current = next;
     }
     
-    // Рисуем фрактал
+    // Генерируем команды рисования
     const step = initLength / Math.pow(2, depth / 2);
-    let x = canvas.width / 2;
-    let y = canvas.height;
-    let angleRad = -Math.PI / 2;
-    let stack = [];
+    const commands = this.generateDrawingCommands(current, step, angle);
     
+    // Вычисляем границы фрактала
+    const bounds = this.calculateBounds(commands, step);
+    
+    // Нормализуем команды под размер canvas
+    const normalizedCommands = this.normalizeCommands(
+      commands, 
+      bounds, 
+      canvas.width, 
+      canvas.height
+    );
+    
+    // Рисуем фрактал
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    
-    for (let char of current) {
-      switch(char) {
-        case 'F':
-          const newX = x + step * Math.cos(angleRad);
-          const newY = y + step * Math.sin(angleRad);
-          ctx.lineTo(newX, newY);
-          x = newX;
-          y = newY;
+    for (const cmd of normalizedCommands) {
+      switch(cmd.type) {
+        case 'move':
+          ctx.moveTo(cmd.x, cmd.y);
           break;
-        case '+':
-          angleRad += angle * Math.PI / 180;
-          break;
-        case '-':
-          angleRad -= angle * Math.PI / 180;
-          break;
-        case '[':
-          stack.push({ x, y, angleRad });
-          break;
-        case ']':
-          const state = stack.pop();
-          x = state.x;
-          y = state.y;
-          angleRad = state.angleRad;
-          ctx.moveTo(x, y);
+        case 'line':
+          ctx.lineTo(cmd.x, cmd.y);
           break;
       }
     }
-    
     ctx.stroke();
   }
   
-  // Методы отрисовки фракталов (аналогичные оригинальным, но с передачей параметров)
   drawTree(ctx, canvas, rules, depth) {
     ctx.strokeStyle = rules.color || '#ff6b6b';
     ctx.lineWidth = 2;
-    ctx.translate(canvas.width / 2, canvas.height);
     
-    this.drawBranch(
-      ctx,
+    // Генерируем команды для дерева
+    const commands = this.generateTreeCommands(
       rules.initLength || 80,
       depth,
       rules.angle * Math.PI / 180,
       rules.lengthFactor || 0.67,
       rules.branches || 2
     );
+    
+    // Вычисляем границы
+    const bounds = this.calculateBounds(commands, rules.initLength || 80);
+    
+    // Нормализуем команды
+    const normalizedCommands = this.normalizeCommands(
+      commands,
+      bounds,
+      canvas.width,
+      canvas.height
+    );
+    
+    // Рисуем
+    ctx.beginPath();
+    for (const cmd of normalizedCommands) {
+      if (cmd.type === 'move') ctx.moveTo(cmd.x, cmd.y);
+      if (cmd.type === 'line') ctx.lineTo(cmd.x, cmd.y);
+    }
+    ctx.stroke();
+  }
+
+  // Новый метод для генерации команд дерева
+  generateTreeCommands(length, depth, angle, lengthFactor, branches) {
+    const commands = [];
+    let x = 0, y = 0;
+    let currentAngle = -Math.PI / 2; // Начинаем с направления вверх
+    const stack = [];
+    
+    commands.push({ type: 'move', x, y });
+    this.generateTreeBranch(commands, x, y, length, depth, angle, lengthFactor, branches, currentAngle);
+    return commands;
+  }
+
+  generateTreeBranch(commands, x, y, length, depth, angle, lengthFactor, branches, currentAngle) {
+    if (depth <= 0) return;
+    
+    const newX = x + length * Math.cos(currentAngle);
+    const newY = y + length * Math.sin(currentAngle);
+    commands.push({ type: 'line', x: newX, y: newY });
+    
+    for (let i = 0; i < branches; i++) {
+      const branchAngle = angle * (i - (branches - 1) / 2);
+      this.generateTreeBranch(
+        commands,
+        newX,
+        newY,
+        length * lengthFactor,
+        depth - 1,
+        angle,
+        lengthFactor,
+        branches,
+        currentAngle + branchAngle
+      );
+      commands.push({ type: 'move', x: newX, y: newY });
+    }
   }
   
   drawBranch(ctx, length, depth, angle, lengthFactor, branches) {
@@ -1144,6 +1186,117 @@ class FractalMusicSystem {
         });
         break;
     }
+  }
+
+  // Новый метод для вычисления границ фрактала
+  calculateBounds(commands, step) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let x = 0, y = 0;
+    let angle = -Math.PI / 2; // Начальный угол (вверх)
+    const stack = [];
+    
+    for (const cmd of commands) {
+      switch(cmd.type) {
+        case 'move':
+          x = cmd.x;
+          y = cmd.y;
+          break;
+        case 'line':
+          minX = Math.min(minX, x, cmd.x);
+          minY = Math.min(minY, y, cmd.y);
+          maxX = Math.max(maxX, x, cmd.x);
+          maxY = Math.max(maxY, y, cmd.y);
+          x = cmd.x;
+          y = cmd.y;
+          break;
+        case 'rotate':
+          angle += cmd.angle;
+          break;
+        case 'push':
+          stack.push({ x, y, angle });
+          break;
+        case 'pop':
+          const state = stack.pop();
+          x = state.x;
+          y = state.y;
+          angle = state.angle;
+          break;
+      }
+    }
+    
+    return { minX, minY, maxX, maxY };
+  }
+
+  // Метод для нормализации команд под новый размер
+  normalizeCommands(commands, bounds, canvasWidth, canvasHeight) {
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    
+    // Вычисляем масштаб так, чтобы фрактал занимал 90% canvas
+    const scale = Math.min(
+      (canvasWidth * 0.9) / width,
+      (canvasHeight * 0.9) / height
+    );
+    
+    // Центрируем фрактал
+    const offsetX = canvasWidth / 2 - (bounds.minX + width / 2) * scale;
+    const offsetY = canvasHeight / 2 - (bounds.minY + height / 2) * scale;
+    
+    return commands.map(cmd => {
+      if (cmd.type === 'line' || cmd.type === 'move') {
+        return {
+          ...cmd,
+          x: cmd.x * scale + offsetX,
+          y: cmd.y * scale + offsetY
+        };
+      }
+      return cmd;
+    });
+  }
+
+  // Модифицированный метод для генерации команд рисования
+  generateDrawingCommands(lsystem, step, angleDeg) {
+    const commands = [];
+    let x = 0, y = 0;
+    let angle = -Math.PI / 2; // Начинаем с направления вверх
+    const stack = [];
+    const angleRad = angleDeg * Math.PI / 180;
+    
+    commands.push({ type: 'move', x, y });
+    
+    for (let char of lsystem) {
+      switch(char) {
+        case 'F':
+          const newX = x + step * Math.cos(angle);
+          const newY = y + step * Math.sin(angle);
+          commands.push({ type: 'line', x: newX, y: newY });
+          x = newX;
+          y = newY;
+          break;
+        case '+':
+          angle += angleRad;
+          commands.push({ type: 'rotate', angle: angleRad });
+          break;
+        case '-':
+          angle -= angleRad;
+          commands.push({ type: 'rotate', angle: -angleRad });
+          break;
+        case '[':
+          stack.push({ x, y, angle });
+          commands.push({ type: 'push' });
+          break;
+        case ']':
+          const state = stack.pop();
+          x = state.x;
+          y = state.y;
+          angle = state.angle;
+          commands.push({ type: 'pop' });
+          commands.push({ type: 'move', x, y });
+          break;
+      }
+    }
+    
+    return commands;
   }
   
   generateMusicPattern(component) {
