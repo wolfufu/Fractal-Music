@@ -472,7 +472,6 @@ class FractalMusicSystem {
   getDefaultRules(type) {
     const defaults = {
       tree: {
-        useLSystem: false,
         angle: 45,
         lengthFactor: 0.67,
         branches: 2,
@@ -480,11 +479,15 @@ class FractalMusicSystem {
         color: '#ff6b6b'
       },
       koch: {
+        segments: 3, 
+        angle: 60,   
+        scaleFactor: 1/3, 
+        color: '#48dbfb',
         useLSystem: false,
-        segments: 4,
-        angle: 60,
-        scaleFactor: 1/3,
-        color: '#48dbfb'
+        axiom: "F++F++F",
+        lsystemRules: {
+          "F": "F-F++F-F"
+        }
       },
       mandelbrot: {
         maxIterations: 100,
@@ -494,7 +497,6 @@ class FractalMusicSystem {
         color: '#1dd1a1'
       },
       dragon: {
-        useLSystem: false,
         color: '#feca57',
         angle: 45,
         scaleFactor: 0.7
@@ -503,22 +505,76 @@ class FractalMusicSystem {
         color: "#5f27cd",
         points: 10000,
         useLSystem: false,
+        // Параметры для режима аксиом:
         axiom: "X",
         lsystemRules: {
-          "X": [
-            {rule: "F+[[X]-X]-F[-FX]+X", probability: 0.5},
-            {rule: "FF", probability: 0.3},
-            {rule: "F[+X][-X]", probability: 0.2}
-          ],
+          "X": "F+[[X]-X]-F[-FX]+X",
           "F": "FF"
         },
         angle: 25,
         initLength: 10
+      },
+      stochastic_tree: {
+        color: "#9b59b6",
+        angle: 22.5,
+        initLength: 60,
+        lengthFactor: 0.7,
+        useLSystem: true,
+        axiom: "F",
+        lsystemRules: {
+          "F": [
+            {rule: "F[+F]F[-F]F", probability: 0.4},
+            {rule: "F[+F]F", probability: 0.3},
+            {rule: "F[-F]F", probability: 0.3}
+          ]
+        }
+      },
+      branching_tree: {
+        color: "#3498db",
+        angle: 22.5,
+        initLength: 70,
+        useLSystem: true,
+        axiom: "F",
+        lsystemRules: {
+          "X": "F[+X][-X]FX",
+          "F": "FF"
+        }
+      },
+      asymmetric_tree: {
+        color: "#e74c3c",
+        angle: 20,
+        initLength: 50,
+        useLSystem: true,
+        axiom: "X",
+        lsystemRules: {
+          "X": "F[+X]F[-X]+X",
+          "F": "FF"
+        }
+      },
+      complex_branching: {
+        color: "#2ecc71",
+        angle: 22.5,
+        initLength: 40,
+        useLSystem: true,
+        axiom: "F",
+        lsystemRules: {
+          "F": "FF-[-F+F+F]+[+F-F-F]"
+        }
+      },
+      simple_branching: {
+        color: "#f1c40f",
+        angle: 25,
+        initLength: 90,
+        useLSystem: true,
+        axiom: "F",
+        lsystemRules: {
+          "F": "F[+F]F[-F]"
+        }
       }
-  };
-  
-  return defaults[type];
-}
+    };
+    
+    return defaults[type];
+  }
   
   updateAllEditors() {
     this.updateEditor('melody');
@@ -584,41 +640,111 @@ class FractalMusicSystem {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     
-    // Для всех фракталов проверяем useLSystem
-    if (rules.useLSystem) {
-      const axiomDefaults = getAxiomDefaults(type);
-      if (axiomDefaults) {
-        const lsystem = generateLSystem({
-          axiom: rules.axiom || axiomDefaults.axiom,
-          rules: rules.lsystemRules || axiomDefaults.rules,
-          depth: depth
-        });
-        this.drawLSystem(ctx, canvas, lsystem, rules.angle || axiomDefaults.angle, rules.initLength || 10);
-      }
-    } else {
-      // Оригинальные методы отрисовки
-      switch(type) {
-        case 'tree':
-          this.drawTree(ctx, canvas, rules, depth);
-          break;
-        case 'koch':
-          this.drawKoch(ctx, canvas, rules, depth);
-          break;
-        case 'mandelbrot':
-          this.drawMandelbrot(ctx, canvas, rules);
-          break;
-        case 'dragon':
-          this.drawDragon(ctx, canvas, rules, depth);
-          break;
-        case 'barnsley':
-          this.drawBarnsleyFern(ctx, canvas, rules, depth); 
-          break;
-        default:
-          console.warn(`Unknown fractal type: ${type}`);
-      }
+    switch(type) {
+      case 'tree':
+        this.drawTree(ctx, canvas, rules, depth);
+        break;
+      case 'koch':
+        this.drawKoch(ctx, canvas, rules, depth);
+        break;
+      case 'mandelbrot':
+        this.drawMandelbrot(ctx, canvas, rules);
+        break;
+      case 'dragon':
+        this.drawDragon(ctx, canvas, rules, depth);
+        break;
+      case 'barnsley':
+        this.drawBarnsleyFern(ctx, canvas, rules, depth); 
+        break;
+      // Добавляем обработку новых фракталов
+      case 'stochastic_tree':
+      case 'branching_tree':
+      case 'asymmetric_tree':
+      case 'complex_branching':
+      case 'simple_branching':
+        this.drawLSystemFractal(ctx, canvas, rules, depth);
+        break;
+      default:
+        console.warn(`Unknown fractal type: ${type}`);
     }
     
     ctx.restore();
+  }
+
+  drawLSystemFractal(ctx, canvas, rules, depth) {
+    const { color, angle = 25, initLength = 50, useLSystem = true } = rules;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    
+    // Генерируем строку по правилам L-системы
+    let current = rules.axiom || "F";
+    const rulesToUse = rules.lsystemRules || {};
+    
+    for (let i = 0; i < depth; i++) {
+      let next = "";
+      for (let char of current) {
+        if (rulesToUse[char]) {
+          if (Array.isArray(rulesToUse[char])) {
+            // Обработка правил с вероятностями
+            const rand = Math.random();
+            let cumulativeProb = 0;
+            for (const rule of rulesToUse[char]) {
+              cumulativeProb += rule.probability;
+              if (rand <= cumulativeProb) {
+                next += rule.rule;
+                break;
+              }
+            }
+          } else {
+            // Стандартная обработка
+            next += rulesToUse[char];
+          }
+        } else {
+          next += char;
+        }
+      }
+      current = next;
+    }
+    
+    // Рисуем фрактал
+    const step = initLength / Math.pow(2, depth / 2);
+    let x = canvas.width / 2;
+    let y = canvas.height;
+    let angleRad = -Math.PI / 2;
+    let stack = [];
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    
+    for (let char of current) {
+      switch(char) {
+        case 'F':
+          const newX = x + step * Math.cos(angleRad);
+          const newY = y + step * Math.sin(angleRad);
+          ctx.lineTo(newX, newY);
+          x = newX;
+          y = newY;
+          break;
+        case '+':
+          angleRad += angle * Math.PI / 180;
+          break;
+        case '-':
+          angleRad -= angle * Math.PI / 180;
+          break;
+        case '[':
+          stack.push({ x, y, angleRad });
+          break;
+        case ']':
+          const state = stack.pop();
+          x = state.x;
+          y = state.y;
+          angleRad = state.angleRad;
+          ctx.moveTo(x, y);
+          break;
+      }
+    }
+    
+    ctx.stroke();
   }
   
   // Методы отрисовки фракталов (аналогичные оригинальным, но с передачей параметров)
@@ -657,35 +783,84 @@ class FractalMusicSystem {
   }
   
   drawKoch(ctx, canvas, rules, depth) {
-    ctx.strokeStyle = rules.color || '#48dbfb';
-    ctx.lineWidth = 1;
+    if (rules.useLSystem) {
+      // Режим L-системы
+      const { color, angle = 60, initLength = 100 } = rules;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      
+      // Генерируем L-систему
+      let current = rules.axiom || "F++F++F";
+      const rulesToUse = rules.lsystemRules || {};
+      
+      for (let i = 0; i < depth; i++) {
+        let next = "";
+        for (let char of current) {
+          next += rulesToUse[char] || char;
+        }
+        current = next;
+      }
+      
+      // Рисуем снежинку
+      const step = initLength / Math.pow(3, depth);
+      let x = canvas.width / 2 - initLength;
+      let y = canvas.height / 2 + initLength * 0.6;
+      let angleRad = 0;
+      
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      
+      for (let char of current) {
+        switch(char) {
+          case 'F':
+            const newX = x + step * Math.cos(angleRad);
+            const newY = y + step * Math.sin(angleRad);
+            ctx.lineTo(newX, newY);
+            x = newX;
+            y = newY;
+            break;
+          case '+':
+            angleRad += angle * Math.PI / 180;
+            break;
+          case '-':
+            angleRad -= angle * Math.PI / 180;
+            break;
+        }
+      }
+      
+      ctx.stroke();
+    } else {
+      // Оригинальный рекурсивный режим
+      ctx.strokeStyle = rules.color || '#48dbfb';
+      ctx.lineWidth = 1;
 
-    const sideLength = Math.min(canvas.width, canvas.height) * 0.6;
-    const height = sideLength * Math.sqrt(3) / 2;
+      const sideLength = Math.min(canvas.width, canvas.height) * 0.6;
+      const height = sideLength * Math.sqrt(3) / 2;
 
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
 
-    const angleDeg = rules.angle || 60;
-    const angleRad = angleDeg * Math.PI / 180;
-    const scaleFactor = rules.scaleFactor || 1 / 3;
+      const angleDeg = rules.angle || 60;
+      const angleRad = angleDeg * Math.PI / 180;
+      const scaleFactor = rules.scaleFactor || 1 / 3;
 
-    const p1 = {
-      x: centerX,
-      y: centerY - (2 / 3) * height
-    };
-    const p2 = {
-      x: centerX - sideLength / 2,
-      y: centerY + (1 / 3) * height
-    };
-    const p3 = {
-      x: centerX + sideLength / 2,
-      y: centerY + (1 / 3) * height
-    };
+      const p1 = {
+        x: centerX,
+        y: centerY - (2 / 3) * height
+      };
+      const p2 = {
+        x: centerX - sideLength / 2,
+        y: centerY + (1 / 3) * height
+      };
+      const p3 = {
+        x: centerX + sideLength / 2,
+        y: centerY + (1 / 3) * height
+      };
 
-    this.drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor);
-    this.drawKochSide(ctx, p2, p3, depth, angleRad, scaleFactor);
-    this.drawKochSide(ctx, p3, p1, depth, angleRad, scaleFactor);
+      this.drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor);
+      this.drawKochSide(ctx, p2, p3, depth, angleRad, scaleFactor);
+      this.drawKochSide(ctx, p3, p1, depth, angleRad, scaleFactor);
+    }
   }
 
   drawKochSide(ctx, p1, p2, depth, angleRad, scaleFactor) {
@@ -796,50 +971,25 @@ class FractalMusicSystem {
 
   drawBarnsleyFern(ctx, canvas, rules, depth) {
     if (rules.useLSystem) {
-      // Режим L-системы с вероятностями
-      const { color, angle = 25 } = rules;
+      // Режим L-системы
+      const { color, angle = 25, initLength = 5 } = rules;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       
-      // Генерируем L-систему с учетом вероятностей
-      let currentAxiom = rules.axiom || "X";
-      const rulesToUse = rules.lsystemRules || {
-        "X": [
-          {rule: "F+[[X]-X]-F[-FX]+X", probability: 0.5},
-          {rule: "FF", probability: 0.3},
-          {rule: "F[+X][-X]", probability: 0.2}
-        ],
-        "F": "FF"
-      };
+      // Генерируем L-систему
+      let current = rules.axiom || "X";
+      const rulesToUse = rules.lsystemRules || {};
       
       for (let i = 0; i < depth; i++) {
         let next = "";
-        for (let char of currentAxiom) {
-          if (rulesToUse[char]) {
-            if (Array.isArray(rulesToUse[char])) {
-              // Обработка правил с вероятностями
-              const rand = Math.random();
-              let cumulativeProb = 0;
-              for (const rule of rulesToUse[char]) {
-                cumulativeProb += rule.probability;
-                if (rand <= cumulativeProb) {
-                  next += rule.rule;
-                  break;
-                }
-              }
-            } else {
-              // Стандартная обработка для других правил
-              next += rulesToUse[char];
-            }
-          } else {
-            next += char;
-          }
+        for (let char of current) {
+          next += rulesToUse[char] || char;
         }
-        currentAxiom = next;
+        current = next;
       }
       
-      // Рисуем L-систему
-      const step = rules.initLength || 5;
+      // Рисуем папоротник
+      const step = initLength / Math.pow(1.5, depth/2);
       let x = canvas.width / 2;
       let y = canvas.height * 0.9;
       let angleRad = -Math.PI / 2;
@@ -848,7 +998,7 @@ class FractalMusicSystem {
       ctx.beginPath();
       ctx.moveTo(x, y);
       
-      for (let char of currentAxiom) {
+      for (let char of current) {
         switch(char) {
           case 'F':
             const newX = x + step * Math.cos(angleRad);
@@ -878,8 +1028,8 @@ class FractalMusicSystem {
       
       ctx.stroke();
     } else {
-      // Оригинальный стохастический режим IFS
-      const { color, points } = rules;
+      // Оригинальный IFS режим
+      const { color, points = 10000 } = rules;
       ctx.fillStyle = color;
       let x = 0, y = 0;
 

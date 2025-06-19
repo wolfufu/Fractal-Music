@@ -6,30 +6,67 @@ export function getAxiomDefaults(type) {
       angle: 90
     },
     koch: {
-      axiom: "F",
-      rules: { "F": "F+F−F−F+F" },
-      angle: 90
+      axiom: "F++F++F", 
+      rules: { 
+        "F": "F-F++F-F" 
+      },
+      angle: 60,
+      initLength: 100
     },
     tree: {
       axiom: "F",
       rules: { "F": "F[+F]F[-F]F" },
       angle: 25
     },
-    barnsley: { 
+    barnsley: {
       axiom: "X",
-      rules: { 
-        "X": [
-          {rule: "F+[[X]-X]-F[-FX]+X", probability: 0.5},
-          {rule: "FF", probability: 0.3},
-          {rule: "F[+X][-X]", probability: 0.2}
+      rules: {
+        "X": "F+[[X]-X]-F[-FX]+X", 
+        "F": "FF" 
+      },
+      angle: 25, 
+      initLength: 5
+    },
+    stochastic_tree: {
+      axiom: "F",
+      rules: {
+        "F": [
+          {rule: "F[+F]F[-F]F", probability: 0.4},
+          {rule: "F[+F]F", probability: 0.3},
+          {rule: "F[-F]F", probability: 0.3}
         ]
       },
-      angle: 25
+      angle: 22.5
     },
-    mandelbrot: {
+    branching_tree: {
       axiom: "F",
-      rules: { "F": "F+F-F-F+F" },
-      angle: 90
+      rules: {
+        "X": "F[+X][-X]FX",
+        "F": "FF"
+      },
+      angle: 22.5
+    },
+    asymmetric_tree: {
+      axiom: "X",
+      rules: {
+        "X": "F[+X]F[-X]+X",
+        "F": "FF"
+      },
+      angle: 20
+    },
+    complex_branching: {
+      axiom: "F",
+      rules: {
+        "F": "FF-[-F+F+F]+[+F-F-F]"
+      },
+      angle: 22.5
+    },
+    simple_branching: {
+      axiom: "F",
+      rules: {
+        "F": "F[+F]F[-F]"
+      },
+      angle: 25
     }
   };
   return presets[type] || null;
