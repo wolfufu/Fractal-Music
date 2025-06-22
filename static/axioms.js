@@ -67,6 +67,15 @@ export function getAxiomDefaults(type) {
         "F": "F[+F]F[-F]"
       },
       angle: 25
+    },
+    barnsley_lsystem: {
+      axiom: "X",
+      rules: {
+        "X": "F+[[X]-X]-F[-FX]+X", 
+        "F": "FF" 
+      },
+      angle: 25, 
+      initLength: 5
     }
   };
   return presets[type] || null;

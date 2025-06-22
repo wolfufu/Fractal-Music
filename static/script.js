@@ -514,6 +514,17 @@ class FractalMusicSystem {
         angle: 25,
         initLength: 10
       },
+      barnsley_lsystem: {
+        color: "#5f27cd",
+        angle: 25,
+        initLength: 10,
+        useLSystem: true,
+        axiom: "X",
+        lsystemRules: {
+          "X": "F+[[X]-X]-F[-FX]+X",
+          "F": "FF"
+        }
+      },
       stochastic_tree: {
         color: "#9b59b6",
         angle: 22.5,
@@ -642,16 +653,28 @@ class FractalMusicSystem {
     
     switch(type) {
       case 'tree':
-        this.drawTree(ctx, canvas, rules, depth);
+        if (rules.useLSystem) {
+          this.drawLSystemFractal(ctx, canvas, rules, depth);
+        } else {
+          this.drawTree(ctx, canvas, rules, depth);
+        }
         break;
       case 'koch':
-        this.drawKoch(ctx, canvas, rules, depth);
+        if (rules.useLSystem) {
+          this.drawLSystemFractal(ctx, canvas, rules, depth);
+        } else {
+          this.drawKoch(ctx, canvas, rules, depth);
+        }
         break;
       case 'mandelbrot':
         this.drawMandelbrot(ctx, canvas, rules);
         break;
       case 'dragon':
-        this.drawDragon(ctx, canvas, rules, depth);
+        if (rules.useLSystem) {
+          this.drawLSystemFractal(ctx, canvas, rules, depth);
+        } else {
+          this.drawDragon(ctx, canvas, rules, depth);
+        }
         break;
       case 'barnsley':
         this.drawBarnsleyFern(ctx, canvas, rules, depth); 
@@ -662,6 +685,7 @@ class FractalMusicSystem {
       case 'asymmetric_tree':
       case 'complex_branching':
       case 'simple_branching':
+      case 'barnsley_lsystem':
         this.drawLSystemFractal(ctx, canvas, rules, depth);
         break;
       default:
