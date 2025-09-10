@@ -74,7 +74,7 @@ def save_composition():
         return jsonify({"error": "Unauthorized"}), 403
 
     with conn.cursor() as cur:
-        # Проверяем, что сессия существует и не истекла
+        # сессия существует и не истекла
         cur.execute("""
             SELECT user_id FROM user_sessions 
             WHERE session_id = %s AND expires_at > NOW()
@@ -87,7 +87,7 @@ def save_composition():
         data = request.get_json()
         
         try:
-            # Проверяем, что данные корректны
+            # данные корректны
             if not all(key in data for key in ["title", "melody", "bass", "drums"]):
                 return jsonify({"error": "Invalid data format"}), 400
                 
@@ -143,7 +143,7 @@ def delete_composition(composition_id):
         return jsonify({"error": "Unauthorized"}), 403
     try:
         with conn.cursor() as cur:
-            # Проверяем, что сессия действительна
+            # сессия действительна
             cur.execute("""
                 SELECT user_id FROM user_sessions 
                 WHERE session_id = %s AND expires_at > NOW()
@@ -154,7 +154,6 @@ def delete_composition(composition_id):
 
             user_id = result[0]
             
-            # Сначала проверяем существование композиции
             cur.execute("""
                 SELECT composition_id FROM compositions 
                 WHERE composition_id = %s AND user_id = %s
@@ -163,30 +162,27 @@ def delete_composition(composition_id):
             
             if not composition:
                 return jsonify({"error": "Composition not found or access denied"}), 404
-            
-            # Удаляем из избранного (если есть)
+
             cur.execute("""
                 DELETE FROM favorites 
                 WHERE composition_id = %s
             """, (composition_id,))
-            
-            # Удаляем саму композицию
+
             cur.execute("""
                 DELETE FROM compositions 
                 WHERE composition_id = %s
             """, (composition_id,))
-            
-            # Добавляем в историю
+
             cur.execute("""
                 INSERT INTO user_history (user_id, action_type, action_data)
                 VALUES (%s, 'composition_deleted', %s)
             """, (user_id, json.dumps({"composition_id": composition_id})))
             
-            conn.commit()  # Явное подтверждение изменений
+            conn.commit()  
             return jsonify({"success": True})
         
     except Exception as e:
-        conn.rollback()  # Откат при ошибке
+        conn.rollback() 
         return jsonify({"error": str(e)}), 500
 
     
@@ -247,7 +243,6 @@ def get_composition(composition_id):
         return jsonify({"error": "Unauthorized"}), 403
 
     with conn.cursor() as cur:
-        # Проверяем, что сессия действительна
         cur.execute("SELECT user_id FROM user_sessions WHERE session_id = %s AND expires_at > NOW()", 
                    (session["session_id"],))
         result = cur.fetchone()
@@ -256,7 +251,7 @@ def get_composition(composition_id):
 
         user_id = result[0]
         
-        # Проверяем, что композиция принадлежит пользователю
+        # композиция принадлежит пользователю
         cur.execute("""
             SELECT title, melody_data, bass_data, drums_data 
             FROM compositions 
@@ -287,7 +282,6 @@ def get_history():
         
         user_id = result[0]
         
-        # Получаем ТОЛЬКО существующие композиции
         cur.execute("""
             SELECT 
                 'composition_created' as action_type,

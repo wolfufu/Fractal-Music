@@ -38,7 +38,6 @@ class FractalMusicSystem {
     }).toDestination();
     this.bassSynth.volume.value = -12;
 
-    // В конструкторе оставьте только один синтезатор:
     this.drumSynth = new Tone.MembraneSynth({
       pitchDecay: 0.05,
       octaves: 5,
@@ -432,25 +431,23 @@ class FractalMusicSystem {
 
   // Экспорт музыки в WAV
   exportMusic() {
-    // Создаем рекордер
     const recorder = new Tone.Recorder();
     this.melodySynth.connect(recorder);
     this.bassSynth.connect(recorder);
     this.drumSynth.connect(recorder);
     
-    // Начинаем запись
     recorder.start();
     
     // Проигрываем композицию
     this.playAll();
     
-    // Через 8 секунд (длина композиции) останавливаем запись
+    // Через 8 секунд остановка записи
     setTimeout(async () => {
       Tone.Transport.stop();
       const recording = await recorder.stop();
       const url = URL.createObjectURL(recording);
       
-      // Создаем ссылку для скачивания
+      // ссылка для скачивания
       const anchor = document.createElement('a');
       anchor.download = `fractal_music_${Date.now()}.wav`;
       anchor.href = url;
@@ -458,7 +455,6 @@ class FractalMusicSystem {
     }, 8000);
   }
 
-  // Вспомогательная функция для скачивания JSON
   downloadObjectAsJson(exportObj, exportName) {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
     const downloadAnchorNode = document.createElement('a');
@@ -679,7 +675,6 @@ class FractalMusicSystem {
       case 'barnsley':
         this.drawBarnsleyFern(ctx, canvas, rules, depth); 
         break;
-      // Добавляем обработку новых фракталов
       case 'stochastic_tree':
       case 'branching_tree':
       case 'asymmetric_tree':
@@ -730,11 +725,11 @@ class FractalMusicSystem {
       current = next;
     }
     
-    // Генерируем команды рисования
+    // команды рисования
     const step = initLength / Math.pow(2, depth / 2);
     const commands = this.generateDrawingCommands(current, step, angle);
     
-    // Вычисляем границы фрактала
+    // границы фрактала
     const bounds = this.calculateBounds(commands, step);
     
     // Нормализуем команды под размер canvas
@@ -1779,7 +1774,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await waitForElement("melody-type");
     window.fractalSystem = new FractalMusicSystem();
     
-    // Теперь загружаем композиции после инициализации системы
+    // загружаем композиции после инициализации системы
     loadSavedCompositions();
     loadFavorites();
   } catch (e) {
